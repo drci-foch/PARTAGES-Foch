@@ -12,7 +12,7 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 |----|-------|--------|
 | **CU1** | Pseudonymisation des CR médicaux | 🟡 Extraction terminée — annotation en attente |
 | **CU2** | Codage CIM-10 depuis CRH | 🟡 Pipeline prêt — en attente liste GHM |
-| **CU3** | Détection de fragilité gériatrique | 🔴 Non démarré |
+| **CU3** | Résumé automatique des CR médicaux | 🔴 Non démarré |
 | **CU5a** | Structuration de données cliniques | 🔴 Non démarré |
 | **CU5b** | Structuration de données cliniques (variante) | 🔴 Non démarré |
 
@@ -37,10 +37,10 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - [ ] Vérifier le taux de séjours avec texte extrait dans `cu2_stats.csv`
 - [ ] Livrer `cu2_dataset.csv` au Health Data Hub *(ne pas livrer `cu2_correspondance_INTERNE.csv`)*
 
-### CU3 — Détection de fragilité gériatrique *(à démarrer)*
+### CU3 — Résumé automatique des CR médicaux
 
 - [ ] Lire le guide PARTAGES v29.01.26 — section CU3
-- [ ] Identifier les sources de données disponibles dans Easily (scores gériatriques, NLP ?)
+- [ ] Identifier les sources de données disponibles dans Easily selon le format attendu des CR.
 - [ ] Créer `WP3_CU3/`
 
 ### CU5a / CU5b — Structuration de données cliniques *(à démarrer)*
