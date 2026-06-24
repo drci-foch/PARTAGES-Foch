@@ -266,8 +266,18 @@ class RSSParser:
                     for pat in ("RSS*.txt", "RSS*.TXT"):
                         rss_files.extend(pmsi_pilot.glob(pat))
 
-        rss_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-        return rss_files
+        # Déduplication : sur un système de fichiers insensible à la casse (Windows),
+        # les motifs *.txt et *.TXT renvoient les mêmes fichiers → on évite de parser 2×.
+        seen = set()
+        unique_files = []
+        for f in rss_files:
+            key = str(f.resolve()).lower()
+            if key not in seen:
+                seen.add(key)
+                unique_files.append(f)
+
+        unique_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        return unique_files
 
     def parse_years(self, years: List[int]) -> List[SejourRSS]:
         """Parse tous les fichiers RSS pour une liste d'années."""

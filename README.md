@@ -13,8 +13,8 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 | **CU1** | Pseudonymisation des CR médicaux | 🟡 Extraction terminée — annotation en attente |
 | **CU2** | Codage CIM-10 depuis CRH | 🟡 Pipeline prêt — en attente liste GHM |
 | **CU3** | Résumé automatique des CR médicaux | 🔴 Non démarré |
-| **CU5a** | Structuration de données cliniques | 🔴 Non démarré |
-| **CU5b** | Structuration de données cliniques (variante) | 🔴 Non démarré |
+| **CU5a** | Identification automatique des biomarqueurs en oncologie | 🟡 Pipeline prêt |
+| **CU5b** | Analyse de la réponse aux traitements en oncologie | 🟡 Pipeline prêt |
 
 ---
 
@@ -43,11 +43,19 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - [ ] Identifier les sources de données disponibles dans Easily selon le format attendu des CR.
 - [ ] Créer `WP3_CU3/`
 
-### CU5a / CU5b — Structuration de données cliniques *(à démarrer)*
+### CU5a — Biomarqueurs en oncologie *(pipeline prêt)*
 
-- [ ] Lire le guide PARTAGES v29.01.26 — sections CU5a et CU5b
-- [ ] Identifier les sources de données (biologie, imagerie, NLP ?)
-- [ ] Créer `WP5_CU5a/` et `WP5_CU5b/`
+- [x] **Tesseract** v5.5 (+ langue `fra`) installé et `TESSERACT_CMD` renseigné dans `.env` — OCR des scans de génétique validé sur la base
+- [ ] Vérifier l'accès au lecteur réseau `S:\Envoi-EDS-PMSI` (RSS, pour la localisation tumorale)
+- [ ] Lancer `python WP5_CU5a/fetch_pool.py` puis `python WP5_CU5a/extract_cu5a.py`
+- [ ] Contrôler l'équilibrage par localisation dans `metadata_cu5a.csv` (ajuster `rss_years` si peu de matchs)
+- [ ] Annoter les 150 CR avec **INCEpTION** (templates CU5a fournis) puis livrer
+
+### CU5b — Réponse aux traitements en oncologie *(pipeline prêt)*
+
+- [ ] Confirmer le périmètre des UF d'oncologie (`oncology_uf_codes` dans `WP5_CU5b/config.py` — par défaut 324A/324E/324B)
+- [ ] Lancer `python WP5_CU5b/fetch_pool.py` puis `python WP5_CU5b/extract_cu5b.py`
+- [ ] Annoter les CR avec **INCEpTION** (templates CU5b fournis) puis livrer
 
 ---
 
@@ -57,7 +65,10 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - Accès au serveur Easily (`srvapp600`) via le réseau Foch
 - Driver ODBC SQL Server installé (`SQL Server Native Client` ou `ODBC Driver 17/18 for SQL Server`)
 - Java (pour la conversion PDF → TXT) — chemin à configurer dans `.env`
-- Accès au partage réseau `S:\Envoi-EDS-PMSI` (fichiers RSS PMSI) pour CU2
+- Accès au partage réseau `S:\Envoi-EDS-PMSI` (fichiers RSS PMSI) pour CU2 et CU5a
+- *(CU5a, optionnel)* **Tesseract OCR** + données de langue `fra` pour océriser les scans de génétique
+  ([installeur Windows](https://github.com/UB-Mannheim/tesseract/wiki)) ; si `tesseract.exe` n'est pas
+  dans le `PATH`, renseigner `TESSERACT_CMD` dans `.env`
 
 ### Installation
 
@@ -73,6 +84,7 @@ Renseigner le mot de passe dans `.env` :
 EASILY_DB_PASSWORD=<mot_de_passe_SITE_READER_BO>
 JAVA_PATH=<chemin_vers_java.exe>          # optionnel, valeur par défaut dans config.py
 PDF_JAR_PATH=<chemin_vers_le_jar>         # optionnel, valeur par défaut dans config.py
+TESSERACT_CMD=<chemin_vers_tesseract.exe> # optionnel (CU5a OCR), si pas dans le PATH
 ```
 
 ---
@@ -128,6 +140,8 @@ WP1_CU1/output/
 | `doc_extension` | Extension source (`pdf`, etc.) |
 | `export_success` | `True` si le fichier a été généré avec succès |
 
+📄 **Méthodologie détaillée** (sélection par exclusion, stratification proportionnelle, validation couche texte) : [docs/methodologie_extraction_CU1.md](docs/methodologie_extraction_CU1.md)
+
 ---
 
 ### CU2 — Codage CIM-10 depuis CRH
@@ -177,6 +191,77 @@ WP2_CU2/output/
 
 ---
 
+### CU5a — Identification automatique des biomarqueurs en oncologie
+
+**Objectif** : constituer un jeu de CR d'anatomopathologie + génomique tumorale (IHC, FISH, NGS) pour évaluer un modèle d'extraction/normalisation des biomarqueurs.
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Volume cible | **150 CR** (fixe : min = idéal = max) |
+| Critère temporel | CR datant de 2010 ou après |
+| Sources (Easily) | `doc_type_code = 5` (CR anapath) + `= 127` (Génétique) |
+| Texte | anapath = couche native (pdfplumber) ; génétique = **scans → OCR** (Tesseract), suffixe `_ocr` |
+| Équilibrage | par type de cancer — localisation déduite des codes CIM-10 `C` via les **RSS PMSI** |
+| Format de sortie | `.txt` — 1 fichier par CR |
+| Métadonnées | `metadata_cu5a.csv` (type, localisation, OCR) — obligatoire : N/A |
+| Annotation | Manuelle avec INCEpTION (templates CU5a fournis) — après extraction |
+
+```bash
+# Étape 1 — pool de candidats (anapath + génétique)
+python WP5_CU5a/fetch_pool.py
+# Étape 2 — localisation (RSS) + échantillon équilibré 150 + extraction texte/OCR
+python WP5_CU5a/extract_cu5a.py
+```
+
+**Sorties :**
+```
+WP5_CU5a/output/
+├── txt/                  # 150 fichiers .txt (suffixe _ocr si océrisé)
+├── metadata_cu5a.csv     # file_id, type, localisation, fréquence, ocr, date
+└── ipp_cu5a.csv          # IPP patients — usage interne (non livré)
+```
+
+> Si le lecteur `S:\` (RSS) est indisponible, l'extraction se poursuit sans stratification (localisation = `Inconnue`).
+> Sans Tesseract installé, les scans de génétique sans couche texte sont ignorés (le reste fonctionne).
+
+---
+
+### CU5b — Analyse de la réponse aux traitements en oncologie
+
+**Objectif** : constituer un jeu de CR de consultation d'oncologie pour évaluer un modèle de classification de la réponse au traitement (4 classes + ND/NA).
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Volume cible | **500 CR** (min 100, max 1000) |
+| Critère temporel | CR datant de 2010 ou après |
+| Source (Easily) | `doc_type_code = 7` (CR consultation) + service d'oncologie |
+| Filtre oncologie | doc → VENUE → SEJOUR avec `sej_uf_medicale_code ∈ {324A, 324E, 324B}` (configurable) |
+| Texte | couche native (pdfplumber) ; OCR de secours si scan |
+| Format de sortie | `.txt` — 1 fichier par CR |
+| Métadonnées | `metadata_cu5b.csv` (service, date, ocr) — obligatoire : N/A |
+| Annotation | Manuelle avec INCEpTION (templates CU5b fournis) — après extraction |
+
+```bash
+# Étape 1 — pool de consultations d'oncologie
+python WP5_CU5b/fetch_pool.py
+# Étape 2 — tirage aléatoire 500 + extraction texte
+python WP5_CU5b/extract_cu5b.py
+```
+
+**Sorties :**
+```
+WP5_CU5b/output/
+├── txt/                  # ~500 fichiers .txt
+├── metadata_cu5b.csv     # file_id, service, date, ocr
+└── ipp_cu5b.csv          # IPP patients — usage interne (non livré)
+```
+
+> ⚠️ Ne jamais livrer `ipp_cu5a.csv` ni `ipp_cu5b.csv` au Health Data Hub.
+
+📄 **Méthodologie détaillée** (choix de sélection, stratification par localisation, OCR, anonymisation) : [docs/methodologie_extraction_CU5.md](docs/methodologie_extraction_CU5.md)
+
+---
+
 ## Structure du projet
 
 ```
@@ -184,18 +269,32 @@ PARTAGES-Foch/
 ├── .env                         # Variables d'environnement (non versionné)
 ├── requirements.txt
 ├── README.md
+├── docs/
+│   ├── methodologie_extraction_CU1.md  # Méthodologie CU1 (exclusion, strat. proportionnelle)
+│   └── methodologie_extraction_CU5.md  # Méthodologie CU5a/CU5b (sélection, strat., OCR)
 ├── utils/
-│   ├── pdf_converter.py         # Conversion PDF → TXT via jar Java
+│   ├── pdf_converter.py         # Conversion PDF → TXT (pdfplumber / jar Java)
+│   ├── ocr.py                   # OCR des scans (PyMuPDF + Tesseract) — CU5a
 │   └── rss_parser.py            # Parser RSS PMSI format groupé 120 (ATIH 2020)
 ├── WP1_CU1/
 │   ├── config.py                # Paramètres CU1 + connexion DB
 │   ├── fetch_pool.py            # Étape 1 : SQL → pool_metadata.csv
 │   ├── extract_cu1.py           # Étape 2 : extraction des 400 CR
 │   └── output/                  # Généré à l'exécution (non versionné)
-└── WP2_CU2/
-    ├── config.py                # Paramètres CU2 + connexion DB
-    ├── fetch_rss.py             # Étape 1 : RSS → pool_rss.csv
-    ├── extract_cu2.py           # Étape 2 : extraction itérative du dataset
+├── WP2_CU2/
+│   ├── config.py                # Paramètres CU2 + connexion DB
+│   ├── fetch_rss.py             # Étape 1 : RSS → pool_rss.csv
+│   ├── extract_cu2.py           # Étape 2 : extraction itérative du dataset
+│   └── output/                  # Généré à l'exécution (non versionné)
+├── WP5_CU5a/
+│   ├── config.py                # Paramètres CU5a (types 5/127, RSS, OCR)
+│   ├── fetch_pool.py            # Étape 1 : SQL → pool_metadata.csv
+│   ├── extract_cu5a.py          # Étape 2 : localisation RSS + 150 CR équilibrés + OCR
+│   └── output/                  # Généré à l'exécution (non versionné)
+└── WP5_CU5b/
+    ├── config.py                # Paramètres CU5b (type 7, UF oncologie)
+    ├── fetch_pool.py            # Étape 1 : SQL (filtre UF onco) → pool_metadata.csv
+    ├── extract_cu5b.py          # Étape 2 : tirage 500 CR + extraction texte
     └── output/                  # Généré à l'exécution (non versionné)
 ```
 
