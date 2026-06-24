@@ -253,7 +253,39 @@ WP5_CU5a/output/                         WP5_CU5b/output/
 
 ---
 
-## 10. Limites connues
+## 10. Conformité au guide PARTAGES (sections 7 et 8)
+
+**CU5a — biomarqueurs (§7)**
+
+| Exigence du guide | Statut |
+|---|---|
+| Profondeur : CR datés ≥ 2010 | ✅ Conforme |
+| Contenu : anatomopathologie + génomique tumorale (IHC, FISH, NGS) | ✅ `doc_type_code ∈ (5, 127)` |
+| Échantillon équilibré par type de cancer | ✅ Stratification équilibrée par localisation (CIM-10 via RSS) ; ⚠️ part `Inconnue` selon couverture RSS |
+| Métadonnées obligatoires : N/A | ✅ |
+| Facultatif : localisation du cancer | ✅ colonne `localisation` |
+| Facultatif : suffixe `_ocr` (répartition OCR/non-OCR) | ✅ |
+
+**CU5b — réponse aux traitements (§8)**
+
+| Exigence du guide | Statut |
+|---|---|
+| Profondeur : CR datés ≥ 2010 | ✅ Conforme |
+| Service d'oncologie **uniquement** | ✅ UF `324A / 324E / 324B` (via VENUE→SEJOUR) |
+| Métadonnées obligatoires : N/A | ✅ |
+| Facultatif : date du CR, suffixe `_ocr` | ✅ `doc_date`, `_ocr` |
+| Facultatif : localisation, dates de traitements | 🟡 À renseigner lors de l'annotation |
+
+**Commun**
+
+| Exigence du guide | Statut |
+|---|---|
+| Format `.txt`, 1 fichier par CR | ✅ Conforme |
+| Annotation manuelle (INCEpTION, JSON UIMA CAS), après extraction | 🟡 Étape aval |
+
+---
+
+## 11. Limites connues
 
 - **Couverture RSS (CU5a)** : seuls les patients avec un séjour PMSI codé cancer obtiennent une
   localisation ; le reste est `Inconnue`. Élargir `rss_years` améliore la couverture au prix du temps
@@ -265,7 +297,7 @@ WP5_CU5a/output/                         WP5_CU5b/output/
 
 ---
 
-## 11. Reproductibilité
+## 12. Reproductibilité
 
 Toutes les sélections aléatoires utilisent `random_state = 42`. À pool et paramètres constants, les
 extractions sont reproductibles. Pré-requis : accès Easily, lecteur `S:\` (CU5a), et Tesseract +

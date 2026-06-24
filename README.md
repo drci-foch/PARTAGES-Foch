@@ -189,6 +189,8 @@ WP2_CU2/output/
 
 > ⚠️ Ne jamais livrer `cu2_correspondance_INTERNE.csv` ni `ipp_cu1.csv` au Health Data Hub.
 
+📄 **Méthodologie détaillée** (sélection des séjours ambulatoires, appariement PMSI ↔ CR, conformité au guide) : [docs/methodologie_extraction_CU2.md](docs/methodologie_extraction_CU2.md)
+
 ---
 
 ### CU5a — Identification automatique des biomarqueurs en oncologie
@@ -271,6 +273,7 @@ PARTAGES-Foch/
 ├── README.md
 ├── docs/
 │   ├── methodologie_extraction_CU1.md  # Méthodologie CU1 (exclusion, strat. proportionnelle)
+│   ├── methodologie_extraction_CU2.md  # Méthodologie CU2 (séjours ambu, appariement PMSI↔CR)
 │   └── methodologie_extraction_CU5.md  # Méthodologie CU5a/CU5b (sélection, strat., OCR)
 ├── utils/
 │   ├── pdf_converter.py         # Conversion PDF → TXT (pdfplumber / jar Java)

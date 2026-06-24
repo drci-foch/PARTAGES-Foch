@@ -167,7 +167,22 @@ WP1_CU1/output/
 
 ---
 
-## 9. Limites connues
+## 9. Conformité au guide PARTAGES (section 4)
+
+| Exigence du guide (§4) | Statut |
+|---|---|
+| Profondeur : CR de moins de 10 ans (rédigés après 2015) | ✅ Conforme (`date_min = 2015`) |
+| Représentativité par année, sexe, tranche d'âge | ✅ Stratification proportionnelle `année × sexe × âge` |
+| Métadonnée obligatoire : strate de chaque document | ✅ `strate` dans `metadata_cu1.csv` |
+| Métadonnée obligatoire : fréquence de la strate dans la population | ✅ `frequence_strate_population` |
+| Représentativité par spécialité (facultatif) | 🟡 Non incluse dans la strate (facultatif au guide) |
+| Documenter une éventuelle pré-annotation par modèle tiers | N/A (aucune pré-annotation réalisée) |
+| Format `.txt`, 1 fichier par CR | ⚠️ Export des PDF validés (couche texte garantie) ; conversion `.txt` en étape aval |
+| Annotation manuelle (INCEpTION, JSON UIMA CAS), après extraction | 🟡 Étape aval |
+
+---
+
+## 10. Limites connues
 
 - **Rejet des scans** : les CR sans couche texte sont écartés (pas d'OCR au CU1). L'échantillon est
   donc constitué de CR nativement textuels.
@@ -177,7 +192,7 @@ WP1_CU1/output/
 
 ---
 
-## 10. Reproductibilité
+## 11. Reproductibilité
 
 Les tirages aléatoires utilisent `random_state = 42` ; à pool et paramètres constants, l'extraction
 est reproductible. Pré-requis : accès Easily depuis le réseau Foch.
