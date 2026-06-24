@@ -147,6 +147,11 @@ class PathConfig:
         return Path(self.output_dir) / "cu2_stats.csv"
 
     @property
+    def cim10_freq_path(self) -> Path:
+        """Distribution complète des CIM-10 DP (métadonnée obligatoire du guide §5.4)."""
+        return Path(self.output_dir) / "cu2_cim10_frequency.csv"
+
+    @property
     def correspondence_path(self) -> Path:
         """Table de correspondance ID anonymisé ↔ numero_admin réel (usage interne)."""
         return Path(self.output_dir) / "cu2_correspondance_INTERNE.csv"

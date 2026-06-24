@@ -457,44 +457,116 @@ def run_extraction(config: CU2Config = None):
 # ---------------------------------------------------------------------------
 
 
+def _enrich_with_demographics(df_all: pd.DataFrame, config: CU2Config) -> pd.DataFrame:
+    """Ajoute le sexe et l'âge (issus du RSS) à chaque séjour livré.
+
+    Jonction : df_out.ID → cu2_correspondance_INTERNE (ID ↔ numero_admin) → pool_rss
+    (sexe, date_naissance, date_entree_iso). Colonnes ajoutées : `sexe`, `age`.
+    """
+    df = df_all.copy()
+    try:
+        corr = pd.read_csv(
+            config.paths.correspondence_path, sep=";", encoding="utf-8-sig", dtype=str
+        ).drop_duplicates("ID")
+        pool = pd.read_csv(
+            config.paths.pool_rss_path, sep=None, engine="python",
+            encoding="utf-8-sig", dtype=str,
+        )
+    except Exception:
+        df["sexe"] = ""
+        df["age"] = pd.NA
+        return df
+
+    pool_cols = pool[["numero_admin", "sexe", "date_naissance", "date_entree_iso"]].drop_duplicates(
+        "numero_admin"
+    )
+    df = df.merge(corr, on="ID", how="left").merge(pool_cols, on="numero_admin", how="left")
+
+    def _age(row):
+        naiss = str(row.get("date_naissance", "") or "").strip()    # JJMMAAAA
+        entree = str(row.get("date_entree_iso", "") or "").strip()  # AAAA-MM-JJ
+        try:
+            if len(naiss) == 8 and naiss.isdigit() and len(entree) >= 4:
+                return float(int(entree[:4]) - int(naiss[4:8]))
+        except Exception:
+            return None
+        return None
+
+    df["age"] = df.apply(_age, axis=1)
+    return df
+
+
 def _print_and_save_stats(
     df_all: pd.DataFrame,
     df_text: pd.DataFrame,
     link_stats: dict,
     config: CU2Config,
 ):
+    # Enrichissement démographique pour les métadonnées obligatoires du guide (§5.4)
+    df_demo = _enrich_with_demographics(df_all, config)
+    df_demo["__age"] = pd.to_numeric(df_demo["age"], errors="coerce")
+
+    n_total = len(df_demo)
+    n_h = int((df_demo["sexe"] == "M").sum())
+    n_f = int((df_demo["sexe"] == "F").sum())
+    age_moyen = df_demo["__age"].dropna().mean()
+
     print(f"\n{'=' * 60}")
     print("STATISTIQUES CU2")
     print(f"{'=' * 60}")
-    print(f"Séjours traités      : {len(df_all)}")
+    print(f"Séjours traités      : {n_total}")
     print(f"Avec texte extrait   : {len(df_text)}")
+    print(f"Sexe ratio           : {n_h} H / {n_f} F"
+          + (f"  (H/F = {n_h / n_f:.2f})" if n_f else ""))
+    print("Âge moyen            : "
+          + (f"{age_moyen:.1f} ans" if pd.notna(age_moyen) else "n/a"))
     print("\nMéthode de liaison RSS→CRH :")
-    for m, n in sorted(link_stats.items(), key=lambda x: -x[1]):
-        print(f"   · {m}: {n}")
+    for m, k in sorted(link_stats.items(), key=lambda x: -x[1]):
+        print(f"   · {m}: {k}")
     print("\nRépartition par spécialité :")
     print(df_all["Spécialité"].value_counts().to_string())
     print("\nTop 10 CIM-10 DP :")
     print(df_text["CIM-10 DP"].value_counts().head(10).to_string())
     print(f"{'=' * 60}\n")
 
-    # Sauvegarde stats
+    # --- cu2_stats.csv : par spécialité (nb, sexe, âge moyen, CIM-10 DP dominant) ---
     stats_rows = []
     for specialite, count in df_all["Spécialité"].value_counts().items():
-        sub = df_text[df_text["Spécialité"] == specialite]
-        stats_rows.append(
-            {
-                "specialite": specialite,
-                "nb_sejours": count,
-                "nb_avec_texte": len(sub),
-                "top_cim10_dp": (
-                    sub["CIM-10 DP"].value_counts().index[0]
-                    if len(sub) > 0 and sub["CIM-10 DP"].value_counts().size > 0
-                    else ""
-                ),
-            }
+        sub = df_demo[df_demo["Spécialité"] == specialite]
+        sub_text = df_text[df_text["Spécialité"] == specialite]
+        age_sp = sub["__age"].dropna().mean()
+        top_dp = (
+            sub_text["CIM-10 DP"].value_counts().index[0]
+            if len(sub_text) > 0 and sub_text["CIM-10 DP"].value_counts().size > 0
+            else ""
         )
+        stats_rows.append({
+            "specialite": specialite,
+            "nb_sejours": int(count),
+            "nb_avec_texte": len(sub_text),
+            "nb_hommes": int((sub["sexe"] == "M").sum()),
+            "nb_femmes": int((sub["sexe"] == "F").sum()),
+            "age_moyen": round(age_sp, 1) if pd.notna(age_sp) else "",
+            "top_cim10_dp": top_dp,
+        })
     pd.DataFrame(stats_rows).to_csv(
         config.paths.stats_path, sep=";", index=False, encoding="utf-8-sig"
+    )
+
+    # --- cu2_cim10_frequency.csv : distribution complète des CIM-10 DP ---
+    cim_counts = (
+        df_all["CIM-10 DP"].fillna("").replace("", pd.NA).dropna().value_counts()
+    )
+    cim_rows = [
+        {
+            "cim10_dp": code,
+            "nb_sejours": int(cnt),
+            "frequence": round(cnt / n_total, 4) if n_total else 0,
+        }
+        for code, cnt in cim_counts.items()
+    ]
+    pd.DataFrame(cim_rows).to_csv(
+        config.paths.cim10_freq_path, sep=";", index=False, encoding="utf-8-sig"
     )
 
 
