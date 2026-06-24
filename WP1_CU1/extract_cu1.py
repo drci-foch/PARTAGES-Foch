@@ -22,7 +22,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from utils.pdf_converter import hash_doc_id
+from utils.pdf_converter import PdfConverter, hash_doc_id
 from config import CU1Config, DEFAULT_CONFIG
 
 # ---------------------------------------------------------------------------
@@ -179,11 +179,19 @@ def validate_candidates(df: pd.DataFrame, config: CU1Config) -> list[dict]:
     return records
 
 
-def save_final(records: list[dict], raw_pdf_dir: Path) -> None:
-    """Sauvegarde sur disque les PDFs de la sélection finale."""
+def save_final(records: list[dict], raw_pdf_dir: Path, txt_dir: Path,
+               converter: PdfConverter) -> None:
+    """Sauvegarde la sélection finale : le `.txt` (livrable annotation) ET le PDF (traçabilité).
+
+    Le format attendu pour l'annotation est `.txt`, 1 fichier par CR (guide PARTAGES §9.1).
+    Le PDF source est conservé en parallèle.
+    """
     raw_pdf_dir.mkdir(parents=True, exist_ok=True)
+    txt_dir.mkdir(parents=True, exist_ok=True)
     for rec in records:
         (raw_pdf_dir / f"{rec['file_id']}.pdf").write_bytes(rec["pdf_bytes"])
+        text = converter.from_bytes(rec["pdf_bytes"]) or ""
+        (txt_dir / f"{rec['file_id']}.txt").write_text(text, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -291,15 +299,16 @@ def run_extraction(config: CU1Config = None):
     # On prend simplement les `target` premiers valides.
     final_records = valid_records[:target]
 
-    # 7. Sauvegarde sur disque
-    print(f"\n📁 Sauvegarde de {len(final_records)} PDFs...")
-    save_final(final_records, config.paths.raw_pdf_dir)
+    # 7. Sauvegarde sur disque : .txt (livrable) + PDF (traçabilité)
+    print(f"\n📁 Sauvegarde de {len(final_records)} CR (.txt + PDF)...")
+    converter = PdfConverter(config.paths.java_path, config.paths.pdf_jar_path)
+    save_final(final_records, config.paths.raw_pdf_dir, config.paths.txt_dir, converter)
 
     # 8. Métadonnées + IPP
     df_meta = pd.DataFrame([
         {
             "file_id": r["file_id"],
-            "filename": f"{r['file_id']}.pdf",
+            "filename": f"{r['file_id']}.txt",
             "strate": r["strate"],
             "frequence_strate_population": round(strate_pop_freq.get(r["strate"], 0), 4),
             "doc_date": r["doc_date"],
@@ -315,8 +324,9 @@ def run_extraction(config: CU1Config = None):
 
     print_stats(df_meta)
     print(f"✅ Extraction terminée !")
-    print(f"   PDFs sauvegardés  : {len(final_records)}")
-    print(f"   Dossier PDFs      : {config.paths.raw_pdf_dir}")
+    print(f"   CR sauvegardés    : {len(final_records)}  (.txt + PDF)")
+    print(f"   Dossier TXT       : {config.paths.txt_dir}")
+    print(f"   Dossier PDF       : {config.paths.raw_pdf_dir}")
     print(f"   Métadonnées       : {config.paths.metadata_path}")
     print(f"   IPP               : {config.paths.ipp_path}  ({df_ipp['pat_ipp'].nunique()} patients distincts)")
 

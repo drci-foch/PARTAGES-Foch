@@ -132,6 +132,7 @@ class PathConfig:
 
     def ensure_dirs(self):
         self.raw_pdf_dir.mkdir(parents=True, exist_ok=True)
+        self.txt_dir.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass

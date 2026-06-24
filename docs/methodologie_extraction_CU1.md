@@ -20,7 +20,7 @@ identifiantes** (noms, dates, adresses…) en vue de la pseudonymisation.
 | Profondeur | CR datés **≥ 2015** (moins de 10 ans) |
 | Types de CR | **Tous** les CR médicaux, hors documents non cliniques |
 | Représentativité | Échantillon **stratifié proportionnel** (année × sexe × tranche d'âge) |
-| Livrable | CR + métadonnées ; annotation manuelle ensuite (INCEpTION, JSON UIMA CAS) |
+| Livrable | `.txt` (1 fichier/CR) + métadonnées ; annotation manuelle ensuite (INCEpTION, JSON UIMA CAS) |
 
 Métadonnée **obligatoire** (guide) : la **strate** de chaque document et, si possible, la **fréquence
 de cette strate** dans la population globale des documents de l'établissement.
@@ -124,12 +124,16 @@ retient exactement `target_count` documents valides.
 1. **`fetch_pool.py`** — une requête SQL → `output/pool_metadata.csv` (pool aléatoire de 20 000 docs).
    À ne relancer que pour rafraîchir le pool.
 2. **`extract_cu1.py`** — lit le pool, calcule les strates, sur-échantillonne, télécharge les binaires
-   par lots, valide la couche texte, sauvegarde la sélection finale.
+   par lots, valide la couche texte, et sauvegarde la sélection finale : un **`.txt` par CR** (livrable)
+   **et** le PDF source (traçabilité).
 
 ```bash
 python WP1_CU1/fetch_pool.py
 python WP1_CU1/extract_cu1.py
 ```
+
+> Utilitaire : `python WP1_CU1/convert_to_txt.py` (re)génère les `.txt` à partir des PDF déjà présents
+> dans `output/raw_pdf/`, sans accès à la base.
 
 ---
 
@@ -137,18 +141,20 @@ python WP1_CU1/extract_cu1.py
 
 ```
 WP1_CU1/output/
-├── raw_pdf/  {file_id}.pdf      # CR validés (couche texte garantie)
-├── metadata_cu1.csv            # file_id, filename, strate, frequence_strate_population, doc_date, departement_code, pdf_size_kb
+├── txt/      {file_id}.txt      # LIVRABLE : 1 fichier texte par CR (format annotation, guide §9.1)
+├── raw_pdf/  {file_id}.pdf      # PDF source conservé (traçabilité)
+├── metadata_cu1.csv            # file_id, filename (.txt), strate, frequence_strate_population, doc_date, departement_code, pdf_size_kb
 └── ipp_cu1.csv                 # IPP patients — usage INTERNE, NE PAS livrer
 ```
 
 - **`file_id`** = `SHA-256(doc_id)` tronqué à 12 caractères → identifiant anonyme et stable.
+- **Livrable = les `.txt`** (1 fichier/CR, format attendu pour l'annotation) ; les **PDF sont conservés
+  en parallèle** pour la traçabilité (option A).
 - **`ipp_cu1.csv`** : à **ne jamais livrer** au Health Data Hub.
 - `output/` et `*.pdf` sont exclus du dépôt (`.gitignore`) : aucune donnée patient versionnée.
 
-> **Étape aval — conversion `.txt`** : le format attendu pour l'annotation est `.txt` (1 fichier/CR).
-> La validation de la couche texte garantit que les PDF exportés sont convertibles ; la conversion
-> elle-même (puis la pré-annotation *pseudoFoch* et l'annotation INCEpTION) constitue l'étape suivante.
+> **Étape suivante** : la couche texte étant validée à l'extraction, les `.txt` sont directement
+> exploitables → pré-annotation *pseudoFoch* puis annotation INCEpTION (export JSON UIMA CAS).
 
 ---
 
@@ -177,7 +183,7 @@ WP1_CU1/output/
 | Métadonnée obligatoire : fréquence de la strate dans la population | ✅ `frequence_strate_population` |
 | Représentativité par spécialité (facultatif) | 🟡 Non incluse dans la strate (facultatif au guide) |
 | Documenter une éventuelle pré-annotation par modèle tiers | N/A (aucune pré-annotation réalisée) |
-| Format `.txt`, 1 fichier par CR | ⚠️ Export des PDF validés (couche texte garantie) ; conversion `.txt` en étape aval |
+| Format `.txt`, 1 fichier par CR | ✅ Conforme (`.txt` produits ; PDF conservés pour traçabilité) |
 | Annotation manuelle (INCEpTION, JSON UIMA CAS), après extraction | 🟡 Étape aval |
 
 ---

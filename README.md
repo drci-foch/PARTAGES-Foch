@@ -120,12 +120,16 @@ python WP1_CU1/extract_cu1.py
 **Sorties :**
 ```
 WP1_CU1/output/
-├── txt/               # Fichiers .txt (1 par CR)
+├── txt/               # Livrable : fichiers .txt (1 par CR)
 │   ├── a3f2b1c4d5e6.txt
 │   └── ...
+├── raw_pdf/           # PDF sources conservés (traçabilité)
 ├── metadata_cu1.csv   # Métadonnées avec strates
 └── ipp_cu1.csv        # IPP patients — usage interne (non livré à PARTAGES)
 ```
+
+> `extract_cu1.py` produit les `.txt` **et** les PDF. Pour (re)générer les `.txt` depuis des PDF déjà
+> extraits : `python WP1_CU1/convert_to_txt.py`.
 
 **Structure de `metadata_cu1.csv` :**
 
