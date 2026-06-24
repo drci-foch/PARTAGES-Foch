@@ -43,10 +43,9 @@ Connexion `pyodbc` au serveur `srvapp600`, utilisateur `SITE_READER_BO` (lecture
 
 ### 3.1 Choix clé : inclure *tous* les CR médicaux, par **exclusion**
 
-Contrairement au CU5 (qui cible des types précis via `doc_type_code`), le CU1 vise la
-**représentativité de l'ensemble des CR médicaux**. La sélection procède donc par **exclusion** des
-documents non cliniques, via des motifs sur `doc_nom` (`doc_exclusion_patterns` dans
-`WP1_CU1/config.py`) :
+Le CU1 vise la **représentativité de l'ensemble des CR médicaux** : tous les CR cliniques sont
+éligibles. La sélection procède donc par **exclusion** des documents non cliniques, via des motifs
+sur `doc_nom` (`doc_exclusion_patterns` dans `WP1_CU1/config.py`) :
 
 > arrêt de travail · transport · protocole de soin · ordonnance · prescription · consentement ·
 > facture · administratif
@@ -85,10 +84,9 @@ calculée par `compute_strate()` :
 
   `0-17 · 18-29 · 30-39 · 40-49 · 50-54 · 55-59 · 60-64 · 65-69 · 70-79 · 80+`
 
-### 4.2 Échantillonnage **proportionnel** (≠ équilibré)
+### 4.2 Échantillonnage **proportionnel**
 
-C'est la différence majeure avec le CU5a. `stratified_sample()` **conserve les proportions** des
-strates observées dans le pool :
+`stratified_sample()` **conserve les proportions** des strates observées dans le pool :
 
 ```
 allocation(strate) = round( fréquence(strate) × cible )
@@ -97,9 +95,6 @@ allocation(strate) = round( fréquence(strate) × cible )
 L'écart d'arrondi est réaffecté à la strate la plus représentée, puis on tire aléatoirement le
 nombre alloué dans chaque strate. L'échantillon **reflète donc l'activité réelle** (une strate
 fréquente reste fréquente), conformément à l'attendu « représentativité » du guide CU1.
-
-> Différence avec CU5a : CU1 = **proportionnel** (représentatif) ; CU5a = **équilibré** (égalise les
-> localisations pour éviter la surreprésentation d'un type de cancer).
 
 ### 4.3 Métadonnée `frequence_strate_population`
 
@@ -117,8 +112,8 @@ Le CU1 ne conserve que des CR **réellement textuels**. Pour chaque candidat (`_
 2. taille ≥ **2048 octets** ;
 3. **couche texte** ≥ **100 caractères** extraits par `pdfplumber` (`_has_text_layer`).
 
-Les **scans sans couche texte sont rejetés** (`no_text_layer`) — le CU1 **n'applique pas d'OCR**
-(contrairement au CU5a). Pour compenser les rejets, on tire un **sur-échantillon**
+Les **scans sans couche texte sont rejetés** (`no_text_layer`) — le CU1 **n'applique pas d'OCR**.
+Pour compenser les rejets, on tire un **sur-échantillon**
 (`oversample_factor = 3.0`) de candidats, on valide en parallèle (`ThreadPoolExecutor`), puis on
 retient exactement `target_count` documents valides.
 
@@ -172,19 +167,7 @@ WP1_CU1/output/
 
 ---
 
-## 9. CU1 vs CU5 — différences de conception
-
-| | **CU1** | **CU5a** | **CU5b** |
-|---|---|---|---|
-| Cible documentaire | tous CR médicaux (par exclusion) | anapath + génétique (`doc_type_code` 5/127) | consultations onco (`doc_type_code` 7 + UF) |
-| Échantillonnage | **proportionnel** (représentatif) | **équilibré** par localisation | aléatoire |
-| Stratification | année × sexe × âge | type de cancer (CIM-10 via RSS) | — |
-| Scans / OCR | rejetés (pas d'OCR) | **OCR** (Tesseract) si scan | OCR de secours |
-| Sortie | PDF validés | `.txt` (+ `_ocr`) | `.txt` (+ `_ocr`) |
-
----
-
-## 10. Limites connues
+## 9. Limites connues
 
 - **Rejet des scans** : les CR sans couche texte sont écartés (pas d'OCR au CU1). L'échantillon est
   donc constitué de CR nativement textuels.
@@ -194,7 +177,7 @@ WP1_CU1/output/
 
 ---
 
-## 11. Reproductibilité
+## 10. Reproductibilité
 
 Les tirages aléatoires utilisent `random_state = 42` ; à pool et paramètres constants, l'extraction
 est reproductible. Pré-requis : accès Easily depuis le réseau Foch.

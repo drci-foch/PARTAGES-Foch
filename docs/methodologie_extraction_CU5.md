@@ -200,7 +200,7 @@ sauvegarde. `oversample_factor = 2.0` pour compenser les rares documents illisib
 
 ---
 
-## 7. Architecture en 2 étapes (commune CU1/CU2/CU5)
+## 7. Architecture en 2 étapes
 
 1. **`fetch_pool.py`** — une seule requête SQL → `output/pool_metadata.csv`. À relancer uniquement si
    l'on veut rafraîchir le pool. Isole l'accès lourd à la base.
