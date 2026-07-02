@@ -78,10 +78,12 @@ class ExtractionConfig:
     max_workers: int = 6
     batch_size: int = 200
 
-    # --- Seuil de validité texte ---
-    # Un document dont la couche texte native fait moins de min_text_chars caractères
-    # est considéré comme un scan à océriser → ÉCARTÉ (pas d'OCR fiable).
-    min_text_chars: int = 100
+    # --- Seuil de validité texte (caractères NON BLANCS) ---
+    # Un document dont la couche texte native contient moins de min_text_chars
+    # caractères non blancs est ÉCARTÉ : soit c'est un scan à océriser (pas d'OCR
+    # fiable), soit un PDF « vide » (about:blank imprimé, enveloppe de messagerie
+    # sécurisée…) dont le texte n'est que des espaces + quelques libellés.
+    min_text_chars: int = 200
 
 
 @dataclass
