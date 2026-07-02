@@ -7,7 +7,8 @@ Critères (guide PARTAGES v29.01.26, section 7) :
   - Volume : 150 CR (fixe)
   - Échantillon équilibré par type de cancer → localisation déduite des codes CIM-10 'C'
     récupérés dans les RSS PMSI (lecteur S:) via les venues du patient
-  - Texte : couche native (pdfplumber) ; scans génétique → OCR (Tesseract) + suffixe _ocr
+  - Texte : couche native uniquement (pdfplumber). Les documents sans couche texte
+    exploitable (scans à océriser) sont ÉCARTÉS — aucune méthode d'OCR fiable (voir §5 doc).
   - Sorties : output/txt/*.txt, metadata_cu5a.csv, ipp_cu5a.csv (interne)
 
 NOTE : Lancez d'abord python WP5_CU5a/fetch_pool.py pour générer pool_metadata.csv.
@@ -26,7 +27,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import CU5aConfig, DEFAULT_CONFIG
 from utils.pdf_converter import PdfConverter, hash_doc_id
 from utils.rss_parser import RSSParser
-from utils import ocr
 
 
 # ---------------------------------------------------------------------------
@@ -189,27 +189,17 @@ def download_binaries(cursor, stockage_ids: list, batch_size: int) -> dict:
 
 
 def _extract_one(args: tuple) -> dict:
-    """Worker : extrait le texte d'un document (natif puis OCR si scan)."""
+    """Worker : extrait la couche texte native d'un document.
+
+    Aucun OCR : faute de méthode d'OCR fiable, un document sans couche texte
+    exploitable (scan) est marqué non valide et sera écarté de l'échantillon.
+    """
     row, fil_data, fil_data_fs, converter, config = args
     ex = config.extraction
     doc_id = str(row["doc_id"])
     file_id = hash_doc_id(doc_id)
 
     text = converter.convert(fil_data, fil_data_fs, str(row.get("doc_extension", "pdf")))
-    is_ocr = False
-
-    if (not text) or (len(text) < ex.min_text_chars):
-        # Pas de couche texte exploitable → tentative OCR (scans génétique de Curie)
-        if fil_data is not None:
-            try:
-                b = bytes(fil_data) if not isinstance(fil_data, (bytes, bytearray)) else fil_data
-                if b[:4] == b"%PDF":
-                    ocr_text = ocr.ocr_pdf_bytes(b, lang=ex.ocr_lang, dpi=ex.ocr_dpi)
-                    if ocr_text and len(ocr_text) >= ex.min_text_chars:
-                        text = ocr_text
-                        is_ocr = True
-            except Exception:
-                pass
 
     valid = bool(text) and len(text) >= ex.min_text_chars
     return {
@@ -220,7 +210,6 @@ def _extract_one(args: tuple) -> dict:
         "doc_date": row["doc_date"].strftime("%Y-%m-%d") if pd.notna(row["doc_date"]) else "",
         "cr_code": row.get("cr_code", ""),
         "pat_ipp": row.get("pat_ipp", ""),
-        "is_ocr": is_ocr,
         "text": text if valid else None,
         "text_chars": len(text) if text else 0,
         "is_valid": valid,
@@ -257,8 +246,7 @@ def save_outputs(records: list[dict], df_for_freq: pd.DataFrame, config: CU5aCon
 
     meta_rows = []
     for r in records:
-        suffix = "_ocr" if r["is_ocr"] else ""
-        filename = f"{r['file_id']}{suffix}.txt"
+        filename = f"{r['file_id']}.txt"
         (txt_dir / filename).write_text(r["text"], encoding="utf-8")
         meta_rows.append({
             "file_id": r["file_id"],
@@ -268,7 +256,6 @@ def save_outputs(records: list[dict], df_for_freq: pd.DataFrame, config: CU5aCon
             "frequence_localisation_pool": round(freq.get(r["localisation"], 0), 4),
             "doc_date": r["doc_date"],
             "cr_code": r["cr_code"],
-            "ocr": r["is_ocr"],
             "text_chars": r["text_chars"],
             "export_success": True,
         })
@@ -290,7 +277,6 @@ def print_stats(df_meta: pd.DataFrame):
     print(df_meta["type"].value_counts().to_string())
     print("\nPar localisation tumorale :")
     print(df_meta["localisation"].value_counts().to_string())
-    print(f"\nOcérisés (_ocr) : {int(df_meta['ocr'].sum())} / {len(df_meta)}")
     print(f"{'=' * 60}\n")
 
 
@@ -318,10 +304,8 @@ def run_extraction(config: CU5aConfig = None):
         print("❌ Pool vide.")
         return
 
-    if not ocr.is_available():
-        print("⚠️  OCR indisponible (pytesseract/Tesseract non installés) : "
-              "les scans génétique sans couche texte seront ignorés.\n"
-              "   → pip install pytesseract + installer Tesseract (langue 'fra').")
+    print("ℹ️  Sélection sur couche texte native uniquement : les documents à océriser "
+          "(scans, ex. génétique) sont écartés (pas de méthode d'OCR fiable).")
 
     # 2. Connexion DB
     print("\n🔗 Connexion à Easily...")
@@ -358,16 +342,17 @@ def run_extraction(config: CU5aConfig = None):
     )
     conn.close()
 
-    # 6. Extraction texte (native + OCR)
+    # 6. Extraction du texte natif (documents à océriser écartés)
     converter = PdfConverter(config.paths.java_path, config.paths.pdf_jar_path)
     records = extract_candidates(df_candidates, file_map, converter, config)
 
     valid = [r for r in records if r["is_valid"]]
-    n_ocr = sum(1 for r in valid if r["is_ocr"])
-    print(f"\n   Valides : {len(valid)} / {len(records)}  (dont OCR : {n_ocr})")
+    n_dropped = len(records) - len(valid)
+    print(f"\n   Valides : {len(valid)} / {len(records)}  "
+          f"(écartés faute de couche texte native : {n_dropped})")
     if len(valid) < target:
         print(f"⚠️  Seulement {len(valid)} documents exploitables (cible : {target}).")
-        print("    → Augmentez sql_pool_size / oversample_factor, ou vérifiez l'OCR.")
+        print("    → Augmentez sql_pool_size / oversample_factor dans config.py.")
 
     # 7. Sélection finale équilibrée parmi les valides
     df_valid = pd.DataFrame(valid)

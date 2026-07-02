@@ -6,8 +6,11 @@ Périmètre (guide PARTAGES v29.01.26, section 8) :
   - CR de consultation (doc_type_code = 7) du service d'oncologie uniquement
   - CR datant de 2010 ou après
   - Volume : min 100 / idéal 500 / max 1000
-  - Format sortie : .txt (1 fichier / CR), suffixe _ocr si le CR est océrisé
-  - Métadonnées obligatoires : N/A ; facultatif : localisation, dates de traitements, date du CR, OCR
+  - Format sortie : .txt (1 fichier / CR)
+  - Métadonnées obligatoires : N/A ; facultatif : localisation, dates de traitements, date du CR
+
+Sélection sur couche texte native uniquement : les documents sans texte extractible
+(scans à océriser) sont ÉCARTÉS car il n'existe pas de méthode d'OCR fiable.
 
 Liaison oncologie : doc → VENUE (doc_venue_id) → SEJOUR (ven_id) → sej_uf_medicale_code ∈ UF onco
 (doc_cr_code = Centre de Responsabilité, ≠ UF → ne PAS l'utiliser)
@@ -75,11 +78,9 @@ class ExtractionConfig:
     max_workers: int = 6
     batch_size: int = 200
 
-    # --- OCR (cas marginal — consultations internes) ---
-    ocr_lang: str = "fra"
-    ocr_dpi: int = 300
-
     # --- Seuil de validité texte ---
+    # Un document dont la couche texte native fait moins de min_text_chars caractères
+    # est considéré comme un scan à océriser → ÉCARTÉ (pas d'OCR fiable).
     min_text_chars: int = 100
 
 

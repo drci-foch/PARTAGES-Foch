@@ -5,7 +5,5 @@ tqdm>=4.65.0
 python-dotenv>=1.0.0
 pdfplumber>=0.10.0
 
-# OCR des scans génétique/génomique (CU5a) — optionnel
-PyMuPDF>=1.24.0        # rastérisation PDF → image
-Pillow>=10.0.0
-pytesseract>=0.3.10    # nécessite aussi le binaire Tesseract + données langue 'fra'
+# NB : pas d'OCR pour CU5a/CU5b — les documents à océriser (scans) sont écartés faute de méthode
+# d'OCR fiable ; on ne conserve que la couche texte native. Aucune dépendance OCR requise.

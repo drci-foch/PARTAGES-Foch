@@ -4,7 +4,13 @@
 > Guide de référence : *Guide de préparation des données par CU* v29.01.26 (sections 7 et 8).
 
 Ce document explique **comment** les jeux de données CU5a et CU5b ont été constitués : les
-sources, les choix de sélection, la stratification par type de cancer, l'OCR, et l'anonymisation.
+sources, les choix de sélection, la stratification par type de cancer, le **filtrage des
+documents à océriser** et l'anonymisation.
+
+> **Décision de sélection (CU5a & CU5b)** — On ne conserve que les documents disposant d'une
+> **couche texte native exploitable**. Tout document qui devrait être **océrisé** (scan sans texte
+> extractible) est **écarté** de l'échantillon : le projet ne dispose pas d'une méthode d'OCR
+> jugée fiable, et un texte océrisé de qualité incertaine fausserait l'évaluation des modèles. Voir §5.
 
 ---
 
@@ -19,8 +25,8 @@ sources, les choix de sélection, la stratification par type de cancer, l'OCR, e
 | Livrable | `.txt` (1 fichier / CR) + métadonnées | `.txt` (1 fichier / CR) + métadonnées |
 | Suite | Annotation manuelle INCEpTION (format JSON UIMA CAS) | idem |
 
-Les métadonnées « obligatoires » sont **N/A** pour ces deux CU ; la localisation du cancer et la
-répartition OCR sont *facultatives* mais fournies ici car elles servent aussi à équilibrer l'échantillon.
+Les métadonnées « obligatoires » sont **N/A** pour ces deux CU ; la localisation du cancer est
+*facultative* mais fournie ici car elle sert aussi à équilibrer l'échantillon.
 
 ---
 
@@ -71,9 +77,10 @@ ET pat_ipp non nul
 ET (fil_data OU fil_data_fs présent)
 ```
 
-- **Anapath (5)** : réalisée en interne à Foch → PDF avec **couche texte native**.
+- **Anapath (5)** : réalisée en interne à Foch → PDF avec **couche texte native** → conservés.
 - **Génétique (127)** : rapports de séquençage, en partie **scannés** (origine Institut Curie) →
-  certains sans couche texte → **OCR nécessaire** (voir §5).
+  ceux **sans couche texte** exploitable sont **écartés** (aucun OCR fiable, voir §5) ; seuls les
+  rapports de génétique disposant d'un texte natif sont retenus.
 
 ### 3.3 CU5b — consultations d'oncologie
 
@@ -156,7 +163,8 @@ groupe, et on redistribue itérativement le reliquat aux groupes encore « ouver
 - une localisation rare n'est jamais sur-tirée au-delà de ce qui existe ;
 - le groupe `Inconnue` est traité comme un groupe parmi d'autres (donc **plafonné**, il ne domine pas) ;
 - on tire d'abord un **sur-échantillon** (`oversample_factor = 3.0`) pour absorber les documents
-  illisibles / sans texte, puis on re-équilibre exactement à 150 parmi les valides.
+  illisibles / **écartés faute de couche texte** (voir §5), puis on re-équilibre exactement à 150
+  parmi les valides.
 
 > ⚠️ La couverture dépend des années de RSS parsées (`rss_years`, par défaut 2019–2025). Les CR
 > anciens ou ambulatoires sans séjour PMSI codé cancer restent en `Inconnue` — à surveiller dans
@@ -164,39 +172,45 @@ groupe, et on redistribue itérativement le reliquat aux groupes encore « ouver
 
 ---
 
-## 5. OCR — texte natif d'abord, océrisation en secours
+## 5. Couche texte native uniquement — les documents à océriser sont écartés
 
-### 5.1 Pourquoi
-Les anapath de Foch ont une couche texte native, mais une partie des rapports de **génétique** sont
-de **purs scans** (0 caractère extractible). Sans OCR, ces CR de séquençage — pourtant au cœur des
-biomarqueurs du CU5a — seraient perdus.
+### 5.1 Décision et justification
+Le projet **ne dispose pas d'une méthode d'OCR fiable**. Un texte océrisé de qualité incertaine
+(erreurs de reconnaissance sur des valeurs de biomarqueurs, des unités, des posologies…) fausserait
+l'évaluation des modèles PARTAGES et introduirait un bruit non maîtrisé dans les jeux annotés.
 
-### 5.2 Logique par document (`extract_cu5a.py`)
+**Choix retenu** : on ne conserve que les documents disposant d'une **couche texte native
+exploitable**. Tout document qui devrait être océrisé (**scan sans texte extractible**) est
+**écarté** de l'échantillon. Cela vaut pour **CU5a** (notamment une partie des rapports de
+**génétique** scannés de l'Institut Curie) **et pour CU5b**.
+
+Conséquence attendue : la génétique scannée (127) sera peu représentée dans CU5a ; seuls les
+rapports de séquençage à texte natif sont retenus. C'est un compromis assumé au profit de la
+**qualité** du texte livré.
+
+### 5.2 Logique par document (`extract_cu5a.py` / `extract_cu5b.py`)
 1. **Extraction native** : `fil_data_fs` (texte natif) si présent, sinon `pdfplumber` sur le PDF.
-2. Si le texte obtenu fait **moins de 100 caractères** et que le contenu est un PDF →
-   **bascule OCR**.
-3. Si l'OCR produit ≥ 100 caractères → on retient ce texte et on marque le document `ocr = True`.
+2. Si le texte obtenu fait **moins de `min_text_chars` (100) caractères** → le document est jugé
+   « à océriser » et **marqué non valide** (`is_valid = False`).
+3. Les documents non valides sont **exclus** de la sélection finale ; le **sur-échantillonnage**
+   (`oversample_factor`, §4.5) compense ces exclusions pour atteindre le volume cible.
 
-### 5.3 Comment l'OCR fonctionne (`utils/ocr.py`)
-- **Rastérisation** des pages avec **PyMuPDF (fitz)** à **300 dpi** → image PNG.
-- **Reconnaissance** avec **pytesseract** → moteur **Tesseract v5.5**, langue **`fra`** (repli sur la
-  langue par défaut si `fra` indisponible).
-- **Localisation du binaire** : variable `TESSERACT_CMD` (`.env`) sinon auto-détection des chemins
-  d'installation usuels sous Windows.
-- **Dégradation propre** : si pytesseract / Tesseract sont absents, `is_available()` renvoie `False`,
-  l'OCR renvoie `None` et le pipeline continue (les scans concernés sont simplement ignorés).
+Aucune bascule OCR n'a lieu : il n'y a plus de dépendance à Tesseract / PyMuPDF dans le pipeline
+CU5. Le seuil `min_text_chars` est le seul levier de la décision « texte natif suffisant ? ».
 
-### 5.4 Marquage `_ocr`
-Conformément au guide, les fichiers océrisés sont nommés **`{file_id}_ocr.txt`** (et `ocr = True`
-dans les métadonnées), afin de tracer la répartition OCR / non-OCR.
+### 5.3 Traçabilité
+Il n'y a plus de fichiers océrisés : les sorties sont nommées **`{file_id}.txt`** (plus de suffixe
+`_ocr`) et il n'y a plus de colonne `ocr` dans les métadonnées. Le nombre de documents écartés faute
+de couche texte se lit dans le journal d'exécution (« Valides : N / M »).
 
 ---
 
 ## 6. CU5b — extraction
 
 Plus simple (pas de PMSI, texte natif) : **tirage aléatoire** (`random_state = 42`) de 500 documents
-parmi le pool de consultations d'oncologie, extraction du texte natif (OCR de secours marginal),
-sauvegarde. `oversample_factor = 2.0` pour compenser les rares documents illisibles.
+parmi le pool de consultations d'oncologie, extraction du **texte natif uniquement**, sauvegarde.
+Les documents sans couche texte (scans à océriser) sont **écartés** (§5) ; `oversample_factor = 2.0`
+compense ces exclusions et les rares documents illisibles.
 
 ---
 
@@ -205,7 +219,8 @@ sauvegarde. `oversample_factor = 2.0` pour compenser les rares documents illisib
 1. **`fetch_pool.py`** — une seule requête SQL → `output/pool_metadata.csv`. À relancer uniquement si
    l'on veut rafraîchir le pool. Isole l'accès lourd à la base.
 2. **`extract_cu5*.py`** — lit le pool, (CU5a) calcule la localisation via RSS et équilibre, télécharge
-   les binaires par lots, extrait le texte (natif/OCR), écrit les sorties. Pas de re-balayage de la base.
+   les binaires par lots, extrait le **texte natif** (documents à océriser écartés), écrit les sorties.
+   Pas de re-balayage de la base.
 
 ```bash
 python WP5_CU5a/fetch_pool.py
@@ -220,15 +235,15 @@ python WP5_CU5b/extract_cu5b.py
 
 ```
 WP5_CU5a/output/                         WP5_CU5b/output/
-├── txt/  {file_id}[_ocr].txt            ├── txt/  {file_id}[_ocr].txt
+├── txt/  {file_id}.txt                  ├── txt/  {file_id}.txt
 ├── metadata_cu5a.csv                    ├── metadata_cu5b.csv
 └── ipp_cu5a.csv   (INTERNE)             └── ipp_cu5b.csv   (INTERNE)
 ```
 
 - **`file_id`** = `SHA-256(doc_id)` tronqué à 12 caractères → nom de fichier anonyme et stable.
 - **`metadata_cu5a.csv`** : `file_id, filename, type, localisation, frequence_localisation_pool,
-  doc_date, cr_code, ocr, text_chars, export_success`.
-- **`metadata_cu5b.csv`** : `file_id, filename, service, doc_date, ocr, text_chars, export_success`.
+  doc_date, cr_code, text_chars, export_success`.
+- **`metadata_cu5b.csv`** : `file_id, filename, service, doc_date, text_chars, export_success`.
 - **`ipp_cu5*.csv`** : liste des IPP patients — **usage interne uniquement, à NE JAMAIS livrer** au
   Health Data Hub.
 - Les dossiers `output/` et les `*.pdf` sont exclus du dépôt (`.gitignore`) : **aucune donnée patient
@@ -248,7 +263,7 @@ WP5_CU5a/output/                         WP5_CU5b/output/
 | Seuil texte valide | 100 car. | 100 car. | `config.py` |
 | UF oncologie | — | `324A,324E,324B` | `config.py` |
 | Années RSS | 2019–2025 | — | `config.py` |
-| OCR (langue / dpi) | `fra` / 300 | `fra` / 300 | `config.py` |
+| OCR | ❌ désactivé (docs à océriser écartés) | ❌ désactivé | (extraction) |
 | Graine aléatoire | 42 | 42 | (extraction) |
 
 ---
@@ -264,7 +279,7 @@ WP5_CU5a/output/                         WP5_CU5b/output/
 | Échantillon équilibré par type de cancer | ✅ Stratification équilibrée par localisation (CIM-10 via RSS) ; ⚠️ part `Inconnue` selon couverture RSS |
 | Métadonnées obligatoires : N/A | ✅ |
 | Facultatif : localisation du cancer | ✅ colonne `localisation` |
-| Facultatif : suffixe `_ocr` (répartition OCR/non-OCR) | ✅ |
+| Répartition OCR/non-OCR | ⚪ Sans objet : documents à océriser écartés (aucun OCR fiable, §5) |
 
 **CU5b — réponse aux traitements (§8)**
 
@@ -273,7 +288,8 @@ WP5_CU5a/output/                         WP5_CU5b/output/
 | Profondeur : CR datés ≥ 2010 | ✅ Conforme |
 | Service d'oncologie **uniquement** | ✅ UF `324A / 324E / 324B` (via VENUE→SEJOUR) |
 | Métadonnées obligatoires : N/A | ✅ |
-| Facultatif : date du CR, suffixe `_ocr` | ✅ `doc_date`, `_ocr` |
+| Facultatif : date du CR | ✅ `doc_date` |
+| Répartition OCR/non-OCR | ⚪ Sans objet : documents à océriser écartés (aucun OCR fiable, §5) |
 | Facultatif : localisation, dates de traitements | 🟡 À renseigner lors de l'annotation |
 
 **Commun**
@@ -290,15 +306,18 @@ WP5_CU5a/output/                         WP5_CU5b/output/
 - **Couverture RSS (CU5a)** : seuls les patients avec un séjour PMSI codé cancer obtiennent une
   localisation ; le reste est `Inconnue`. Élargir `rss_years` améliore la couverture au prix du temps
   de parsing.
+- **Documents à océriser écartés** : les scans sans couche texte native (notamment une partie de la
+  génétique 127 du CU5a) sont **exclus** faute d'OCR fiable — la génétique scannée est donc
+  sous-représentée. Si une méthode d'OCR fiable devient disponible, il faudra réintroduire une étape
+  d'océrisation (voir historique Git de `extract_cu5*.py`) et réévaluer la couverture.
 - **Blobs corrompus** : quelques `fil_data` illisibles dans `FILES` (`Data-loss while decompressing`) ;
   ils sont ignorés et compensés par le sur-échantillonnage.
 - **Dates** : on utilise `doc_realisation_date`, avec repli sur `doc_creation_date` si absente.
-- **Qualité OCR** : dépend de la qualité du scan d'origine.
 
 ---
 
 ## 12. Reproductibilité
 
 Toutes les sélections aléatoires utilisent `random_state = 42`. À pool et paramètres constants, les
-extractions sont reproductibles. Pré-requis : accès Easily, lecteur `S:\` (CU5a), et Tesseract +
-langue `fra` pour l'OCR (sinon les scans de génétique sont ignorés).
+extractions sont reproductibles. Pré-requis : accès Easily et lecteur `S:\` (CU5a). Aucun OCR n'est
+requis : les documents sans couche texte native sont simplement écartés.
