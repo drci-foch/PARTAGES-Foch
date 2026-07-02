@@ -193,6 +193,10 @@ def _extract_one(args: tuple) -> dict:
 
     Aucun OCR : faute de méthode d'OCR fiable, un document sans couche texte
     exploitable (scan) est marqué non valide et sera écarté de l'échantillon.
+
+    La validité se mesure sur les caractères NON BLANCS : un PDF « vide »
+    (page about:blank imprimée, enveloppe de messagerie sécurisée…) possède une
+    couche texte faite d'espaces et de quelques libellés — il doit être écarté.
     """
     row, fil_data, fil_data_fs, converter, config = args
     ex = config.extraction
@@ -200,8 +204,9 @@ def _extract_one(args: tuple) -> dict:
     file_id = hash_doc_id(doc_id)
 
     text = converter.convert(fil_data, fil_data_fs, str(row.get("doc_extension", "pdf")))
+    meaningful_chars = len("".join(text.split())) if text else 0
 
-    valid = bool(text) and len(text) >= ex.min_text_chars
+    valid = meaningful_chars >= ex.min_text_chars
     return {
         "file_id": file_id,
         "doc_type_code": int(row["doc_type_code"]),
@@ -211,7 +216,7 @@ def _extract_one(args: tuple) -> dict:
         "cr_code": row.get("cr_code", ""),
         "pat_ipp": row.get("pat_ipp", ""),
         "text": text if valid else None,
-        "text_chars": len(text) if text else 0,
+        "text_chars": meaningful_chars,
         "is_valid": valid,
     }
 

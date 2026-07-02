@@ -190,13 +190,19 @@ rapports de séquençage à texte natif sont retenus. C'est un compromis assumé
 
 ### 5.2 Logique par document (`extract_cu5a.py` / `extract_cu5b.py`)
 1. **Extraction native** : `fil_data_fs` (texte natif) si présent, sinon `pdfplumber` sur le PDF.
-2. Si le texte obtenu fait **moins de `min_text_chars` (100) caractères** → le document est jugé
-   « à océriser » et **marqué non valide** (`is_valid = False`).
+2. On compte les caractères **non blancs** du texte (`len("".join(text.split()))`). S'ils sont
+   **moins de `min_text_chars` (200)** → le document est **marqué non valide** (`is_valid = False`).
 3. Les documents non valides sont **exclus** de la sélection finale ; le **sur-échantillonnage**
    (`oversample_factor`, §4.5) compense ces exclusions pour atteindre le volume cible.
 
-Aucune bascule OCR n'a lieu : il n'y a plus de dépendance à Tesseract / PyMuPDF dans le pipeline
-CU5. Le seuil `min_text_chars` est le seul levier de la décision « texte natif suffisant ? ».
+> ⚠️ **Comptage sur les caractères non blancs** (et non `len(text)` brut). Certains PDF ont une
+> couche texte quasi vide — page `about:blank` imprimée depuis un navigateur, ou simple enveloppe
+> de messagerie sécurisée (« Envoi n°… Messagerie sécurisée Lifen ») — mais faite de centaines
+> d'espaces : ils passaient un seuil calculé sur `len(text)` alors qu'ils ne contiennent aucun CR.
+> Le seuil de 200 sépare nettement ces déchets (≤ ~130 car. non blancs observés) des vrais CR
+> (≥ ~500). C'est le seul levier de la décision « texte natif exploitable ? ».
+
+Aucune bascule OCR n'a lieu : il n'y a plus de dépendance à Tesseract / PyMuPDF dans le pipeline CU5.
 
 ### 5.3 Traçabilité
 Il n'y a plus de fichiers océrisés : les sorties sont nommées **`{file_id}.txt`** (plus de suffixe
@@ -260,7 +266,7 @@ WP5_CU5a/output/                         WP5_CU5b/output/
 | Cible | 150 | 500 | `config.py` |
 | Taille du pool SQL | 8 000 | 6 000 | `config.py` |
 | Sur-échantillonnage | ×3.0 | ×2.0 | `config.py` |
-| Seuil texte valide | 100 car. | 100 car. | `config.py` |
+| Seuil texte valide | 200 car. non blancs | 200 car. non blancs | `config.py` |
 | UF oncologie | — | `324A,324E,324B` | `config.py` |
 | Années RSS | 2019–2025 | — | `config.py` |
 | OCR | ❌ désactivé (docs à océriser écartés) | ❌ désactivé | (extraction) |
