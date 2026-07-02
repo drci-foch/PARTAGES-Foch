@@ -13,8 +13,8 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 | **CU1** | Pseudonymisation des CR médicaux | 🟡 Extraction terminée — annotation en attente |
 | **CU2** | Codage CIM-10 depuis CRH | 🟡 Pipeline prêt — en attente liste GHM |
 | **CU3** | Résumé automatique des CR médicaux | 🔴 Non démarré |
-| **CU5a** | Identification automatique des biomarqueurs en oncologie | 🟡 Pipeline prêt |
-| **CU5b** | Analyse de la réponse aux traitements en oncologie | 🟡 Pipeline prêt |
+| **CU5a** | Identification automatique des biomarqueurs en oncologie | 🟡 Extraction terminée — annotation en attente |
+| **CU5b** | Analyse de la réponse aux traitements en oncologie | 🟡 Extraction terminée — annotation en attente |
 
 ---
 
@@ -43,19 +43,22 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - [ ] Identifier les sources de données disponibles dans Easily selon le format attendu des CR.
 - [ ] Créer `WP3_CU3/`
 
-### CU5a — Biomarqueurs en oncologie *(pipeline prêt)*
+### CU5a — Biomarqueurs en oncologie *(extraction terminée)*
 
 - [x] **Décision OCR** : pas de méthode d'OCR fiable → les documents à océriser (scans, ex. génétique) sont **écartés**, on ne garde que la couche texte native
-- [ ] Vérifier l'accès au lecteur réseau `S:\Envoi-EDS-PMSI` (RSS, pour la localisation tumorale)
-- [ ] Lancer `python WP5_CU5a/fetch_pool.py` puis `python WP5_CU5a/extract_cu5a.py`
-- [ ] Contrôler l'équilibrage par localisation dans `metadata_cu5a.csv` (ajuster `rss_years` si peu de matchs)
-- [ ] Annoter les 150 CR avec **INCEpTION** (templates CU5a fournis) puis livrer
+- [x] Accès au lecteur réseau `S:\Envoi-EDS-PMSI` (RSS) validé — localisation tumorale calculée
+- [x] Extraction lancée (`fetch_pool.py` + `extract_cu5a.py`) → **150 CR** (147 anapath + 3 génétique)
+- [x] Équilibrage par localisation contrôlé dans `metadata_cu5a.csv` (15 localisations)
+- [ ] **Décider du faible volume de génétique** (3/150) : acceptable en l'état, ou investiguer une solution d'OCR fiable pour intégrer les rapports numérisés (Institut Curie)
+- [ ] Clarifier les **règles d'annotation** et finaliser les **templates INCEpTION** : liste + normalisation des biomarqueurs (valeurs, unités, statuts IHC/FISH/NGS) ; cas particuliers (documents multi-CR, mentions négatives/absentes)
+- [ ] Annoter les 150 CR avec **INCEpTION** (JSON UIMA CAS) puis livrer au Health Data Hub
 
-### CU5b — Réponse aux traitements en oncologie *(pipeline prêt)*
+### CU5b — Réponse aux traitements en oncologie *(extraction terminée)*
 
-- [ ] Confirmer le périmètre des UF d'oncologie (`oncology_uf_codes` dans `WP5_CU5b/config.py` — par défaut 324A/324E/324B)
-- [ ] Lancer `python WP5_CU5b/fetch_pool.py` puis `python WP5_CU5b/extract_cu5b.py`
-- [ ] Annoter les CR avec **INCEpTION** (templates CU5b fournis) puis livrer
+- [x] Périmètre des UF d'oncologie **confirmé** (`oncology_uf_codes` = 324A / 324E / 324B)
+- [x] Extraction lancée (`fetch_pool.py` + `extract_cu5b.py`) → **500 CR** de consultation (2020–2026)
+- [ ] Clarifier les **règles d'annotation** et finaliser les **templates INCEpTION** : classes de réponse (4 classes + ND/NA) et gestion des cas ambigus
+- [ ] Annoter les CR avec **INCEpTION** (JSON UIMA CAS) puis livrer au Health Data Hub
 
 ---
 
