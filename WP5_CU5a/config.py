@@ -7,8 +7,11 @@ Périmètre (guide PARTAGES v29.01.26, section 7) :
   - CR datant de 2010 ou après
   - Volume : exactement 150 (min = idéal = max)
   - Échantillon équilibré par type de cancer (localisation déduite des codes CIM-10 C via RSS PMSI)
-  - Format sortie : .txt (1 fichier / CR), suffixe _ocr pour les CR océrisés (scans génétique)
-  - Métadonnées obligatoires : N/A ; facultatif : localisation du cancer + répartition OCR
+  - Format sortie : .txt (1 fichier / CR)
+  - Métadonnées obligatoires : N/A ; facultatif : localisation du cancer
+
+Sélection sur couche texte native uniquement : les documents sans texte extractible
+(scans à océriser, ex. génétique) sont ÉCARTÉS car il n'existe pas de méthode d'OCR fiable.
 
 Liaison Easily : DOCUMENTS.doc_type_code  (5 = CR anapath, 127 = Génétique)
 """
@@ -50,7 +53,7 @@ class ExtractionConfig:
 
     # --- Types de documents (référentiel TYPE_DOCUMENT) ---
     # 5 = "Compte-rendu anapath" (texte natif, Foch)
-    # 127 = "Génétique" (scans Institut Curie → OCR)
+    # 127 = "Génétique" (souvent des scans Institut Curie → écartés faute de couche texte)
     doc_type_codes: list = field(default_factory=lambda: [5, 127])
     type_labels: dict = field(default_factory=lambda: {5: "anapath", 127: "genetique"})
 
@@ -98,11 +101,9 @@ class ExtractionConfig:
         "C81-C96": "Tissus lymphoïde et hématopoïétique",
     })
 
-    # --- OCR (scans génétique) ---
-    ocr_lang: str = "fra"
-    ocr_dpi: int = 300
-
     # --- Seuils de validité texte ---
+    # Un document dont la couche texte native fait moins de min_text_chars caractères
+    # est considéré comme un scan à océriser → ÉCARTÉ (pas d'OCR fiable).
     min_text_chars: int = 100
 
 

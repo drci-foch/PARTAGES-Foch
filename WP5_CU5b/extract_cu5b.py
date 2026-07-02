@@ -5,7 +5,8 @@ Hôpital Foch / Projet PARTAGES
 Critères (guide PARTAGES v29.01.26, section 8) :
   - CR de consultation (type 7) du service d'oncologie (UF 324A/324E/324B), datés ≥ 2010
   - Volume : 500 CR (idéal ; min 100, max 1000)
-  - Texte : couche native (pdfplumber) ; OCR de secours si scan + suffixe _ocr
+  - Texte : couche native uniquement (pdfplumber). Les documents sans couche texte
+    exploitable (scans à océriser) sont ÉCARTÉS — pas de méthode d'OCR fiable.
   - Sorties : output/txt/*.txt, metadata_cu5b.csv, ipp_cu5b.csv (interne)
 
 NOTE : Lancez d'abord python WP5_CU5b/fetch_pool.py pour générer pool_metadata.csv.
@@ -22,7 +23,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import CU5bConfig, DEFAULT_CONFIG
 from utils.pdf_converter import PdfConverter, hash_doc_id
-from utils import ocr
 
 
 # ---------------------------------------------------------------------------
@@ -63,32 +63,23 @@ def download_binaries(cursor, stockage_ids: list, batch_size: int) -> dict:
 
 
 def _extract_one(args: tuple) -> dict:
+    """Extrait la couche texte native d'un document.
+
+    Aucun OCR : faute de méthode d'OCR fiable, un document sans couche texte
+    exploitable (scan) est marqué non valide et sera écarté de l'échantillon.
+    """
     row, fil_data, fil_data_fs, converter, config = args
     ex = config.extraction
     doc_id = str(row["doc_id"])
     file_id = hash_doc_id(doc_id)
 
     text = converter.convert(fil_data, fil_data_fs, str(row.get("doc_extension", "pdf")))
-    is_ocr = False
-
-    if (not text) or (len(text) < ex.min_text_chars):
-        if fil_data is not None:
-            try:
-                b = bytes(fil_data) if not isinstance(fil_data, (bytes, bytearray)) else fil_data
-                if b[:4] == b"%PDF":
-                    ocr_text = ocr.ocr_pdf_bytes(b, lang=ex.ocr_lang, dpi=ex.ocr_dpi)
-                    if ocr_text and len(ocr_text) >= ex.min_text_chars:
-                        text = ocr_text
-                        is_ocr = True
-            except Exception:
-                pass
 
     valid = bool(text) and len(text) >= ex.min_text_chars
     return {
         "file_id": file_id,
         "doc_date": row["doc_date"].strftime("%Y-%m-%d") if pd.notna(row["doc_date"]) else "",
         "pat_ipp": row.get("pat_ipp", ""),
-        "is_ocr": is_ocr,
         "text": text if valid else None,
         "text_chars": len(text) if text else 0,
         "is_valid": valid,
@@ -123,15 +114,13 @@ def save_outputs(records: list[dict], config: CU5bConfig) -> pd.DataFrame:
 
     meta_rows = []
     for r in records:
-        suffix = "_ocr" if r["is_ocr"] else ""
-        filename = f"{r['file_id']}{suffix}.txt"
+        filename = f"{r['file_id']}.txt"
         (txt_dir / filename).write_text(r["text"], encoding="utf-8")
         meta_rows.append({
             "file_id": r["file_id"],
             "filename": filename,
             "service": "oncologie",
             "doc_date": r["doc_date"],
-            "ocr": r["is_ocr"],
             "text_chars": r["text_chars"],
             "export_success": True,
         })
@@ -152,7 +141,6 @@ def print_stats(df_meta: pd.DataFrame):
     print("\nRépartition par année :")
     years = pd.to_datetime(df_meta["doc_date"], errors="coerce").dt.year
     print(years.value_counts().sort_index().to_string())
-    print(f"\nOcérisés (_ocr) : {int(df_meta['ocr'].sum())} / {len(df_meta)}")
     print(f"{'=' * 60}\n")
 
 
@@ -196,9 +184,8 @@ def run_extraction(config: CU5bConfig = None):
         return
     cursor = conn.cursor()
 
-    if not ocr.is_available():
-        print("ℹ️  OCR indisponible : les rares scans sans couche texte seront ignorés "
-              "(consultations onco = texte natif, impact marginal).")
+    print("ℹ️  Sélection sur couche texte native uniquement : les documents à océriser "
+          "(scans) sont écartés (pas de méthode d'OCR fiable).")
 
     print(f"\n⬇️  Téléchargement de {len(df_candidates)} fichiers...")
     file_map = download_binaries(
