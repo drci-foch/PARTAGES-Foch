@@ -58,7 +58,10 @@ class PdfConverter:
             with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
                 pages = []
                 for page in pdf.pages:
-                    text = page.extract_text()
+                    # layout=True préserve la disposition spatiale (espaces selon les positions),
+                    # ce qui garde les colonnes des tableaux alignées. Repli sur l'extraction
+                    # simple si la version "layout" ne renvoie rien pour une page.
+                    text = page.extract_text(layout=True) or page.extract_text()
                     if text:
                         pages.append(text)
                 result = "\n".join(pages).strip()
