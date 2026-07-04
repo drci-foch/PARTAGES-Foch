@@ -12,7 +12,7 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 |----|-------|--------|
 | **CU1** | Pseudonymisation des CR médicaux | 🟡 Extraction terminée — annotation en attente |
 | **CU2** | Codage CIM-10 depuis CRH | 🟡 Pipeline prêt — en attente liste GHM |
-| **CU3** | Résumé automatique des CR médicaux | 🔴 Non démarré |
+| **CU3** | Résumé automatique des CR médicaux | 🟡 Extraction terminée (400 CR) — validation avant livraison |
 | **CU5a** | Identification automatique des biomarqueurs en oncologie | 🟡 Extraction terminée — annotation en attente |
 | **CU5b** | Analyse de la réponse aux traitements en oncologie | 🟡 Extraction terminée — annotation en attente |
 
@@ -37,11 +37,18 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - [ ] Vérifier le taux de séjours avec texte extrait dans `cu2_stats.csv`
 - [ ] Livrer `cu2_dataset.csv` au Health Data Hub *(ne pas livrer `cu2_correspondance_INTERNE.csv`)*
 
-### CU3 — Résumé automatique des CR médicaux
+### CU3 — Résumé automatique des CR médicaux *(extraction terminée)*
 
-- [ ] Lire le guide PARTAGES v29.01.26 — section CU3
-- [ ] Identifier les sources de données disponibles dans Easily selon le format attendu des CR.
-- [ ] Créer `WP3_CU3/`
+- [x] Lire le guide PARTAGES v29.01.26 — section CU3 (+ FAQ #3, #5, #10)
+- [x] Identifier les sources : Easily (METADONE/STOCKAGE), tous CR médicaux par exclusion + filtre « conclusion détectée »
+- [x] Créer `WP3_CU3/` (pipeline calqué sur CU1) + `utils/conclusion_splitter.py` (découpage corps/conclusion)
+- [x] Extraction lancée (`fetch_pool.py` + `extract_cu3.py`) → **400 CR = 800 fichiers .txt** (corps + `_conclusion`), strate dans le nom des fichiers
+- [x] Vérification d'exploitabilité : appariement corps/conclusion, fichiers non vides, UTF-8, cohérence métadonnées ↔ disque
+- [x] Audit qualité (relecture manuelle + scan des 400 paires) et corrections : exclusion des fiches « Contexte de vie », suppression de la mention RGPD/EDS, validation sur caractères utiles (hors pieds de page), rejet `anchor_in_body` (fuite de conclusion dans le corps) — audit final : 0 anomalie
+- [ ] **Confirmer la fenêtre temporelle** avec le CU3 lead (perceval.wajsburt@aphp.fr) : lecture retenue « ≥ 2020 », le guide dit « au plus tard entre 2020-2022 » (ambigu) — si 2020-2022 strict : ajuster `date_max` dans `WP3_CU3/config.py` et relancer
+- [ ] Faire relire un échantillon de paires corps/conclusion par un clinicien (qualité du découpage)
+- [ ] À la livraison, signaler au CU3 lead : répartition **100 % non-OCR** (aucun suffixe `_ocr`) + protocole de détection de la conclusion (balises ancres, cf. `docs/methodologie_extraction_CU3.md` §4)
+- [ ] Livrer les `.txt` + `metadata_cu3.csv` au Health Data Hub *(ne pas livrer `ipp_cu3.csv`)*
 
 ### CU5a — Biomarqueurs en oncologie *(extraction terminée)*
 
@@ -70,7 +77,7 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - Java (pour la conversion PDF → TXT) — chemin à configurer dans `.env`
 - Accès au partage réseau `S:\Envoi-EDS-PMSI` (fichiers RSS PMSI) pour CU2 et CU5a
 
-> **CU5a / CU5b — pas d'OCR** : seuls les documents à **couche texte native** sont retenus ; les
+> **CU3 / CU5a / CU5b — pas d'OCR** : seuls les documents à **couche texte native** sont retenus ; les
 > documents à océriser (scans) sont **écartés** faute de méthode d'OCR fiable. Aucun Tesseract requis.
 
 ### Installation
@@ -199,6 +206,49 @@ WP2_CU2/output/
 
 ---
 
+### CU3 — Résumé automatique des CR médicaux
+
+**Objectif** : constituer un jeu de CR médicaux dont la **conclusion est identifiée et séparée du corps**, pour évaluer un modèle de génération automatique de conclusions.
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Volume cible | 400 CR (min 100, max 1000) |
+| Critère temporel | CR datés **≥ 2020** (interprétation du guide, à confirmer avec le CU3 lead) |
+| Types de CR | Tous CR médicaux (exclusion : ordonnances, admin…) **avec conclusion détectée** |
+| Détection conclusion | Balises ancres en début de ligne (FAQ #10) : CONCLUSION, AU TOTAL, EN SYNTHESE, EN RESUME… |
+| Texte | **couche native uniquement** ; scans écartés (pas d'OCR) → aucun suffixe `_ocr` |
+| Format de sortie | **2 fichiers `.txt` par CR** : corps sans conclusion + conclusion seule (`_conclusion`) |
+| Nommage | `{file_id}_{strate}.txt` — la strate figure dans le nom (métadonnée obligatoire §6.4) |
+| Métadonnées | `metadata_cu3.csv` — strate, fréquence, balise détectée, tailles |
+| Annotation | **Aucune** (guide §6.3) |
+
+**Lancer l'extraction (2 étapes) :**
+
+```bash
+# Étape 1 — à faire une seule fois : pool aléatoire de 20 000 documents
+python WP3_CU3/fetch_pool.py
+
+# Étape 2 — stratification + téléchargement + découpage corps/conclusion
+python WP3_CU3/extract_cu3.py
+```
+
+**Sorties :**
+```
+WP3_CU3/output/
+├── txt/                                    # Livrable : 2 fichiers par CR
+│   ├── {file_id}_{strate}.txt              #   corps SANS la conclusion
+│   └── {file_id}_{strate}_conclusion.txt   #   conclusion seule
+├── raw_pdf/                                # PDF sources conservés (traçabilité)
+├── metadata_cu3.csv                        # Métadonnées (strate, fréquence, balise…)
+└── ipp_cu3.csv                             # IPP patients — usage interne (non livré)
+```
+
+> ⚠️ Ne jamais livrer `ipp_cu3.csv` au Health Data Hub.
+
+📄 **Méthodologie détaillée** (périmètre par exclusion, détection de conclusion par balises ancres, garde-fous anti faux positifs, stratification) : [docs/methodologie_extraction_CU3.md](docs/methodologie_extraction_CU3.md)
+
+---
+
 ### CU5a — Identification automatique des biomarqueurs en oncologie
 
 **Objectif** : constituer un jeu de CR d'anatomopathologie + génomique tumorale (IHC, FISH, NGS) pour évaluer un modèle d'extraction/normalisation des biomarqueurs.
@@ -280,9 +330,11 @@ PARTAGES-Foch/
 ├── docs/
 │   ├── methodologie_extraction_CU1.md  # Méthodologie CU1 (exclusion, strat. proportionnelle)
 │   ├── methodologie_extraction_CU2.md  # Méthodologie CU2 (séjours ambu, appariement PMSI↔CR)
+│   ├── methodologie_extraction_CU3.md  # Méthodologie CU3 (détection conclusion, découpage 2 fichiers)
 │   └── methodologie_extraction_CU5.md  # Méthodologie CU5a/CU5b (sélection, strat., exclusion docs à océriser)
 ├── utils/
 │   ├── pdf_converter.py         # Conversion PDF → TXT (pdfplumber / jar Java)
+│   ├── conclusion_splitter.py   # CU3 : détection + découpage corps/conclusion (balises ancres)
 │   └── rss_parser.py            # Parser RSS PMSI format groupé 120 (ATIH 2020)
 ├── WP1_CU1/
 │   ├── config.py                # Paramètres CU1 + connexion DB
@@ -293,6 +345,11 @@ PARTAGES-Foch/
 │   ├── config.py                # Paramètres CU2 + connexion DB
 │   ├── fetch_rss.py             # Étape 1 : RSS → pool_rss.csv
 │   ├── extract_cu2.py           # Étape 2 : extraction itérative du dataset
+│   └── output/                  # Généré à l'exécution (non versionné)
+├── WP3_CU3/
+│   ├── config.py                # Paramètres CU3 (fenêtre 2020+, balises conclusion, seuils)
+│   ├── fetch_pool.py            # Étape 1 : SQL → pool_metadata.csv
+│   ├── extract_cu3.py           # Étape 2 : stratification + découpage corps/conclusion (400 CR)
 │   └── output/                  # Généré à l'exécution (non versionné)
 ├── WP5_CU5a/
 │   ├── config.py                # Paramètres CU5a (types 5/127, RSS)

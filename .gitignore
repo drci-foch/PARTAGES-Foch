@@ -138,6 +138,10 @@ celerybeat.pid
 **/output/
 WP1_CU1/output/
 
+# Config outillage local
+.claude/
+_tmp_*
+
 # Environments
 .env
 .envrc
