@@ -23,7 +23,7 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 ### CU1 — Pseudonymisation *(extraction terminée)*
 
 - [ ] Lancer **pseudoFoch** sur les fichiers `WP1_CU1/output/txt/` pour générer un pré-annotation automatique
-- [ ] Annoter manuellement les 400 CR avec **INCEpTION** (format JSON UIMA CAS)
+- [ ] Annoter manuellement les 400 CR avec **INCEpTION** (format JSON UIMA CAS) — mise en place : [inception/README.md](inception/README.md)
 - [ ] Vérifier la couverture des strates après annotation (voir `metadata_cu1.csv`)
 - [ ] Livrer les fichiers annotés au Health Data Hub
 
@@ -58,14 +58,14 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - [x] Équilibrage par localisation contrôlé dans `metadata_cu5a.csv` (15 localisations)
 - [ ] **Décider du faible volume de génétique** (3/150) : acceptable en l'état, ou investiguer une solution d'OCR fiable pour intégrer les rapports numérisés (Institut Curie)
 - [ ] Clarifier les **règles d'annotation** et finaliser les **templates INCEpTION** : liste + normalisation des biomarqueurs (valeurs, unités, statuts IHC/FISH/NGS) ; cas particuliers (documents multi-CR, mentions négatives/absentes)
-- [ ] Annoter les 150 CR avec **INCEpTION** (JSON UIMA CAS) puis livrer au Health Data Hub
+- [ ] Annoter les 150 CR avec **INCEpTION** (JSON UIMA CAS) puis livrer au Health Data Hub — mise en place : [inception/README.md](inception/README.md)
 
 ### CU5b — Réponse aux traitements en oncologie *(extraction terminée)*
 
 - [x] Périmètre des UF d'oncologie **confirmé** (`oncology_uf_codes` = 324A / 324E / 324B)
 - [x] Extraction lancée (`fetch_pool.py` + `extract_cu5b.py`) → **500 CR** de consultation (2020–2026)
 - [ ] Clarifier les **règles d'annotation** et finaliser les **templates INCEpTION** : classes de réponse (4 classes + ND/NA) et gestion des cas ambigus
-- [ ] Annoter les CR avec **INCEpTION** (JSON UIMA CAS) puis livrer au Health Data Hub
+- [ ] Annoter les CR avec **INCEpTION** (JSON UIMA CAS) puis livrer au Health Data Hub — mise en place : [inception/README.md](inception/README.md)
 
 ---
 
@@ -332,6 +332,12 @@ PARTAGES-Foch/
 │   ├── methodologie_extraction_CU2.md  # Méthodologie CU2 (séjours ambu, appariement PMSI↔CR)
 │   ├── methodologie_extraction_CU3.md  # Méthodologie CU3 (détection conclusion, découpage 2 fichiers)
 │   └── methodologie_extraction_CU5.md  # Méthodologie CU5a/CU5b (sélection, strat., exclusion docs à océriser)
+├── inception/
+│   ├── README.md                # Mise en place d'INCEpTION de A à Z (CU1, CU5a, CU5b)
+│   ├── Template INCEpTION - Tags et Label CU1, CU5a, CU5b.zip   # Templates officiels PARTAGES (v38.5)
+│   ├── make_livraison.ps1       # Assemble le dossier de déploiement à copier sur le réseau Foch
+│   └── docker/                  # Kit clé en main : compose, provisionnement, import des documents,
+│                                #   README-MISE-EN-PROD.md (guide pas à pas pour l'admin prod)
 ├── utils/
 │   ├── pdf_converter.py         # Conversion PDF → TXT (pdfplumber / jar Java)
 │   ├── conclusion_splitter.py   # CU3 : détection + découpage corps/conclusion (balises ancres)

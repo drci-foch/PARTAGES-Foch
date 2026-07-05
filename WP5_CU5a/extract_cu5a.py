@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import CU5aConfig, DEFAULT_CONFIG
-from utils.pdf_converter import PdfConverter, hash_doc_id
+from utils.pdf_converter import PdfConverter, hash_doc_id, is_binary_garbage
 from utils.rss_parser import RSSParser
 
 
@@ -206,7 +206,10 @@ def _extract_one(args: tuple) -> dict:
     text = converter.convert(fil_data, fil_data_fs, str(row.get("doc_extension", "pdf")))
     meaningful_chars = len("".join(text.split())) if text else 0
 
-    valid = meaningful_chars >= ex.min_text_chars
+    # Écarte les PDF corrompus décodés comme du binaire (octets NUL / caractères de
+    # contrôle en masse) : ils passent le seuil de caractères mais ne sont pas du texte
+    # et sont refusés par les outils d'annotation (ex. INCEpTION).
+    valid = meaningful_chars >= ex.min_text_chars and not is_binary_garbage(text)
     return {
         "file_id": file_id,
         "doc_type_code": int(row["doc_type_code"]),

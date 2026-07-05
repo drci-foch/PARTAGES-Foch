@@ -1,0 +1,26 @@
+# INCEpTION — déploiement PARTAGES (Hôpital Foch)
+#
+# Image OFFICIELLE du projet INCEpTION. Version épinglée ≥ 38.5 :
+# les templates PARTAGES ont été exportés avec INCEpTION 38.5 et ne
+# s'importent pas dans une version plus ancienne.
+#
+# Les données (projets, utilisateurs, annotations) vivent dans ./data
+# (monté sur /export) — PAS dans l'image : sauvegarder ce dossier
+# quotidiennement pendant les campagnes d'annotation.
+#
+# Démarrage :   docker compose up -d
+# Arrêt :       docker compose down          (les données restent dans ./data)
+# Logs :        docker compose logs -f
+
+services:
+  inception:
+    image: ghcr.io/inception-project/inception:38.5
+    container_name: inception-partages
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      JAVA_OPTS: "-Xmx4g"
+    volumes:
+      - ./data:/export
+      - ./settings.properties:/export/settings.properties:ro

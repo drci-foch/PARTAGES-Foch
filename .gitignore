@@ -137,6 +137,7 @@ celerybeat.pid
 # Données patients — ne jamais versionner
 **/output/
 WP1_CU1/output/
+inception/docker/data/
 
 # Config outillage local
 .claude/

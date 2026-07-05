@@ -8,10 +8,30 @@ Stratégie :
 
 import hashlib
 import io
+import re
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Optional
+
+# Caractères de contrôle (hors tabulation, saut de ligne, retour chariot, form feed).
+# Un texte « propre » n'en contient pas ; leur présence en masse signale un binaire
+# mal décodé (PDF corrompu extrait comme du texte).
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0B\x0E-\x1F]")
+
+
+def is_binary_garbage(text: str, max_control_ratio: float = 0.005) -> bool:
+    """True si `text` ressemble à un binaire corrompu plutôt qu'à du texte.
+
+    Rejette dès qu'un octet NUL est présent, ou si la proportion de caractères
+    de contrôle dépasse `max_control_ratio` (0,5 % par défaut).
+    """
+    if not text:
+        return False
+    if "\x00" in text:
+        return True
+    n_control = len(_CONTROL_CHARS_RE.findall(text))
+    return n_control / len(text) > max_control_ratio
 
 try:
     import pdfplumber
