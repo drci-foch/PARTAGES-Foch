@@ -3,8 +3,11 @@
 Hôpital Foch / Projet PARTAGES
 
 Critères (guide PARTAGES v29.01.26) :
-  - Séjours ambulatoires 2023-2025
-  - 1 000 séjours (tirage aléatoire)
+  - Séjours ambulatoires 2023-2025, GHM de l'annexe (référentiel versionné)
+  - 1 000 séjours (parcours aléatoire du pool, seed 42)
+  - Exigences PARTAGES : texte ET codes CCAM obligatoires sur chaque ligne
+    → séjours sans CCAM écartés du pool ; séjours sans texte exploitable
+    consignés dans cu2_rejets_INTERNE.csv et jamais écrits au dataset
   - Source : RSS + CRH/CRO depuis Easily
   - Format sortie : CSV (5 colonnes : ID, Spécialité, Texte, Codes CCAM, CIM-10 DP)
   - Fichier stats : cu2_stats.csv
@@ -59,6 +62,16 @@ def load_pool(config: CU2Config) -> pd.DataFrame:
             print(
                 f"   → Filtre GHM ({len(whitelist)} GHM) : "
                 f"{len(df):,} séjours retenus sur {before:,}"
+            )
+    # Exigence PARTAGES : les codes CCAM sont obligatoires sur chaque ligne
+    # → les séjours RSS sans acte CCAM sont écartés d'emblée.
+    if "codes_ccam" in df.columns:
+        before = len(df)
+        df = df[df["codes_ccam"].fillna("").str.strip() != ""].copy()
+        if len(df) < before:
+            print(
+                f"   → Filtre codes CCAM non vides : "
+                f"{len(df):,} séjours (- {before - len(df):,})"
             )
     return df
 
@@ -323,6 +336,39 @@ def _append_correspondence(corr_path: Path, sejour_id: str, numero_admin: str):
     )
 
 
+_REJECT_COLUMNS = ["numero_admin", "raison"]
+
+
+def _load_rejected(rejects_path: Path) -> set[str]:
+    """Séjours déjà traités mais écartés (pas de texte) — évite de les retenter."""
+    if not rejects_path.exists():
+        return set()
+    try:
+        df = pd.read_csv(
+            rejects_path, sep=";", encoding="utf-8-sig",
+            usecols=["numero_admin"], dtype=str,
+        )
+        return set(df["numero_admin"].dropna().str.strip().tolist())
+    except Exception:
+        return set()
+
+
+def _append_reject(rejects_path: Path, numero_admin: str, raison: str):
+    """Consigne un séjour écarté (usage interne : traçabilité + reprise)."""
+    write_header = not rejects_path.exists()
+    pd.DataFrame(
+        [{"numero_admin": numero_admin, "raison": raison}],
+        columns=_REJECT_COLUMNS,
+    ).to_csv(
+        rejects_path,
+        sep=";",
+        mode="a",
+        index=False,
+        header=write_header,
+        encoding="utf-8-sig",
+    )
+
+
 def run_extraction(config: CU2Config = None):
     if config is None:
         config = DEFAULT_CONFIG
@@ -339,17 +385,17 @@ def run_extraction(config: CU2Config = None):
 
     print(f"   → {len(df_pool):,} séjours dans le pool")
 
-    # 2. Tirage aléatoire (reproductible via random_state=42)
+    # 2. Ordre de parcours aléatoire reproductible (random_state=42).
+    # Exigence PARTAGES : chaque ligne livrée doit avoir du texte → on parcourt
+    # le pool mélangé et on s'arrête quand `target_count` séjours AVEC texte
+    # sont écrits. Les séjours sans texte exploitable sont consignés dans
+    # cu2_rejets_INTERNE.csv (traçabilité + reprise sans retraitement).
     target = config.extraction.target_count
-    if len(df_pool) > target:
-        df_sample = df_pool.sample(n=target, random_state=42).reset_index(drop=True)
-        print(f"   → Tirage aléatoire : {target} séjours")
-    else:
-        df_sample = df_pool.copy().reset_index(drop=True)
-        print(f"   ⚠️ Pool < cible : on prend les {len(df_sample)} séjours disponibles")
+    df_order = df_pool.sample(frac=1, random_state=42).reset_index(drop=True)
 
-    # 3. Reprise : ignorer les séjours déjà traités
+    # 3. Reprise : séjours déjà livrés (IDs) et déjà rejetés (numeros)
     already_done = _load_already_done(config.paths.output_csv_path)
+    rejected = _load_rejected(config.paths.rejects_path)
     if already_done:
         # Garde-fou : des séjours extraits avant réception du référentiel GHM
         # peuvent être hors du pool filtré ; ils resteraient dans le CSV final.
@@ -365,26 +411,24 @@ def run_extraction(config: CU2Config = None):
             if not stale.empty:
                 print(
                     f"   ⚠️ {len(stale)} séjours déjà extraits sont hors du pool "
-                    "filtré par GHM (extraction antérieure au référentiel ?).\n"
+                    "filtré (extraction antérieure au référentiel GHM ou au "
+                    "filtre CCAM ?).\n"
                     "      → Pour un dataset conforme, archivez/supprimez "
-                    "cu2_dataset.csv et cu2_correspondance_INTERNE.csv puis relancez."
+                    "cu2_dataset.csv, cu2_correspondance_INTERNE.csv et "
+                    "cu2_rejets_INTERNE.csv puis relancez."
                 )
         except Exception:
             pass
-        # Pré-calculer les IDs du sample pour filtrer
-        df_sample["_id"] = df_sample["numero_admin"].apply(
-            lambda x: hash_sejour_id(str(x).strip())
-        )
-        df_sample = df_sample[~df_sample["_id"].isin(already_done)].drop(columns="_id")
-        df_sample = df_sample.reset_index(drop=True)
+    if already_done or rejected:
         print(
-            f"   → Reprise : {len(already_done)} déjà traités, {len(df_sample)} restants"
+            f"   → Reprise : {len(already_done)} séjours valides déjà écrits, "
+            f"{len(rejected)} rejetés connus (non retentés)"
         )
     else:
-        print(f"   → Nouveau départ : {len(df_sample)} séjours à traiter")
+        print(f"   → Nouveau départ : cible {target} séjours avec texte")
 
-    if df_sample.empty:
-        print("✅ Tous les séjours ont déjà été traités.")
+    if len(already_done) >= target:
+        print("✅ La cible est déjà atteinte.")
         return
 
     all_patterns = (
@@ -415,21 +459,28 @@ def run_extraction(config: CU2Config = None):
     cursor = conn.cursor()
     print("✅ Connecté\n")
 
-    # 6. Extraction itérative — écriture immédiate après chaque séjour
+    # 6. Extraction itérative — seuls les séjours AVEC texte sont écrits ;
+    # on parcourt le pool mélangé jusqu'à atteindre la cible.
     link_stats = {"venue": 0, "ipp_dates": 0, "not_found": 0}
-    n_with_text = 0
+    n_written = len(already_done)
+    n_rejected_run = 0
 
-    for _, row in tqdm(
-        df_sample.iterrows(), total=len(df_sample), desc="Extraction CU2"
-    ):
+    pbar = tqdm(total=target, initial=n_written, desc="Extraction CU2 (avec texte)")
+    for _, row in df_order.iterrows():
+        if n_written >= target:
+            break
+
         numero_admin = str(row.get("numero_admin", "")).strip()
+        sejour_id = hash_sejour_id(numero_admin)
+        if sejour_id in already_done or numero_admin in rejected:
+            continue
+
         date_entree = str(row.get("date_entree_iso", "")).strip()
         date_sortie = str(row.get("date_sortie_iso", "")).strip()
         ghm = str(row.get("ghm", "")).strip()
         dp = str(row.get("dp", "")).strip()
         codes_ccam = str(row.get("codes_ccam", "")).strip()
 
-        sejour_id = hash_sejour_id(numero_admin)
         specialite = get_specialite(
             ghm,
             config.extraction.ghm_specialites,
@@ -460,6 +511,14 @@ def run_extraction(config: CU2Config = None):
                         texts.append(t)
             texte = "\n\n---\n\n".join(texts)
 
+        if len(texte) < _MIN_TEXT_CHARS:
+            # Pas de texte exploitable → séjour écarté (jamais écrit au dataset)
+            raison = "cr_non_trouve" if method == "not_found" else "texte_inexploitable"
+            _append_reject(config.paths.rejects_path, numero_admin, raison)
+            rejected.add(numero_admin)
+            n_rejected_run += 1
+            continue
+
         out_row = {
             "ID": sejour_id,
             "Spécialité": specialite,
@@ -471,11 +530,18 @@ def run_extraction(config: CU2Config = None):
         # ── Sauvegarde immédiate ──
         _append_row(config.paths.output_csv_path, out_row)
         _append_correspondence(config.paths.correspondence_path, sejour_id, numero_admin)
+        already_done.add(sejour_id)
+        n_written += 1
+        pbar.update(1)
 
-        if len(texte) >= _MIN_TEXT_CHARS:
-            n_with_text += 1
-
+    pbar.close()
     conn.close()
+
+    if n_written < target:
+        print(
+            f"\n⚠️ Pool épuisé : {n_written}/{target} séjours avec texte "
+            f"({n_rejected_run} rejets sur ce run)."
+        )
 
     # 7. Statistiques finales (calculées depuis le CSV complet)
     df_out = pd.read_csv(
@@ -487,8 +553,8 @@ def run_extraction(config: CU2Config = None):
     _print_and_save_stats(df_out, df_with_text, link_stats, config)
 
     print(f"\n✅ Extraction CU2 terminée !")
-    print(f"   Total dans le CSV  : {len(df_out)}")
-    print(f"   Avec texte extrait : {len(df_with_text)}")
+    print(f"   Total dans le CSV  : {len(df_out)} (toutes lignes avec texte + CCAM)")
+    print(f"   Rejets (sans texte): {n_rejected_run} sur ce run  ← cu2_rejets_INTERNE.csv")
     print(f"   CSV (PARTAGES)     : {config.paths.output_csv_path}")
     print(f"   Correspondance     : {config.paths.correspondence_path}  ← usage interne")
     print(f"   Stats              : {config.paths.stats_path}")

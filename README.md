@@ -166,6 +166,7 @@ WP1_CU1/output/
 | Critère temporel | 2023, 2024, 2025 |
 | Filtre | Séjours ambulatoires (durée = 0 jour) |
 | Filtre GHM | 71 GHM de l'annexe PARTAGES (ortho/traumato, viscéral, urologie) — `WP2_CU2/referentiel/liste_ghm_chirurgie_ambulatoire.csv` |
+| Exigences par ligne | **Texte** (CRH/CRO ≥ 100 car.) **et codes CCAM** obligatoires — séjours non conformes écartés (`cu2_rejets_INTERNE.csv`) |
 | Source RSS | `S:\Envoi-EDS-PMSI` |
 | Source documents | METADONE — CRH + CRO |
 | Format de sortie | `cu2_dataset.csv` (séparateur `;`) — 5 colonnes |
@@ -197,7 +198,8 @@ WP2_CU2/output/
 ├── cu2_dataset.csv                    # Dataset livré à PARTAGES
 ├── cu2_stats.csv                      # Statistiques par spécialité
 ├── cu2_cim10_frequency.csv            # Distribution complète des CIM-10 DP
-└── cu2_correspondance_INTERNE.csv     # ID ↔ numero_admin réel — usage interne uniquement
+├── cu2_correspondance_INTERNE.csv     # ID ↔ numero_admin réel — usage interne uniquement
+└── cu2_rejets_INTERNE.csv             # Séjours écartés (sans texte) — usage interne uniquement
 ```
 
 > ⚠️ Ne jamais livrer `cu2_correspondance_INTERNE.csv` ni `ipp_cu1.csv` au Health Data Hub.

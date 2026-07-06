@@ -186,6 +186,11 @@ class PathConfig:
         """Table de correspondance ID anonymisé ↔ numero_admin réel (usage interne)."""
         return Path(self.output_dir) / "cu2_correspondance_INTERNE.csv"
 
+    @property
+    def rejects_path(self) -> Path:
+        """Séjours traités mais écartés (pas de texte exploitable) — usage interne."""
+        return Path(self.output_dir) / "cu2_rejets_INTERNE.csv"
+
     def ensure_dirs(self):
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
 

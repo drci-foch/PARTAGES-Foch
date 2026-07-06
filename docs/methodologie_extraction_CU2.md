@@ -18,7 +18,7 @@ modèle qui prédit le DP à partir du compte rendu et des actes.
 
 | Paramètre | Valeur |
 |---|---|
-| Volume cible | **1 000 séjours** (tirage aléatoire) |
+| Volume cible | **1 000 séjours** — chacun avec **texte** et **codes CCAM** (exigence PARTAGES) |
 | Période | **2023–2025** |
 | Périmètre | Séjours de **chirurgie ambulatoire** (durée = 0 jour) |
 | Spécialités visées | Chirurgie orthopédique/traumato, chirurgie viscérale, urologie — **71 GHM** de l'annexe PARTAGES (13/12/2025) |
@@ -117,12 +117,16 @@ diagnostic, `ghm_to_specialite`).
 ## 6. Architecture en 2 étapes
 
 1. **`fetch_rss.py`** — parse les RSS, filtre (ambulatoire, GHM), dédoublonne → `output/pool_rss.csv`.
-2. **`extract_cu2.py`** — re-filtre le pool par GHM (sécurité), tire aléatoirement `target_count`
-   séjours (`random_state = 42`), apparie les CR, extrait le texte, écrit le dataset.
-   **Reprise automatique** : les séjours déjà présents dans le CSV de sortie sont ignorés (écriture
-   ligne à ligne, robuste aux interruptions). **Garde-fou** : si des séjours déjà extraits sont hors
-   du pool filtré (extraction antérieure au référentiel GHM), une alerte demande d'archiver les
-   sorties et de relancer.
+2. **`extract_cu2.py`** — re-filtre le pool par GHM (sécurité) et **écarte les séjours sans codes
+   CCAM** (exigence PARTAGES), puis parcourt le pool **mélangé** (`random_state = 42`) et n'écrit
+   que les séjours dont le **texte a pu être extrait** (≥ 100 caractères), jusqu'à atteindre
+   `target_count` lignes valides. Les séjours sans texte exploitable sont consignés dans
+   `cu2_rejets_INTERNE.csv` (raison : `cr_non_trouve` / `texte_inexploitable`) et ne sont **jamais**
+   écrits au dataset.
+   **Reprise automatique** : les séjours déjà livrés (IDs du CSV) et déjà rejetés ne sont pas
+   retraités (écriture ligne à ligne, robuste aux interruptions). **Garde-fou** : si des séjours
+   déjà extraits sont hors du pool filtré (extraction antérieure au référentiel GHM ou au filtre
+   CCAM), une alerte demande d'archiver les sorties et de relancer.
 
 ```bash
 python WP2_CU2/fetch_rss.py
@@ -139,7 +143,8 @@ WP2_CU2/output/
 ├── cu2_dataset.csv                 # Dataset livré à PARTAGES (5 colonnes)
 ├── cu2_stats.csv                   # Par spécialité : nb séjours, sexe (H/F), âge moyen, CIM-10 DP dominant
 ├── cu2_cim10_frequency.csv         # Distribution complète des CIM-10 DP (code, nb, fréquence)
-└── cu2_correspondance_INTERNE.csv  # ID anonymisé ↔ numero_admin réel (INTERNE)
+├── cu2_correspondance_INTERNE.csv  # ID anonymisé ↔ numero_admin réel (INTERNE)
+└── cu2_rejets_INTERNE.csv          # Séjours écartés (sans texte exploitable) + raison (INTERNE)
 ```
 
 - **`ID`** = `SHA-256(numero_admin)` tronqué à 16 caractères → identifiant anonyme et stable.
