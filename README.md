@@ -11,7 +11,7 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 | CU | Titre | Statut |
 |----|-------|--------|
 | **CU1** | Pseudonymisation des CR médicaux | 🟡 Extraction terminée — annotation en attente |
-| **CU2** | Codage CIM-10 depuis CRH | 🟡 Pipeline prêt — en attente liste GHM |
+| **CU2** | Codage CIM-10 depuis CRH | 🟡 Liste GHM implémentée — extraction en cours (1 000 séjours) |
 | **CU3** | Résumé automatique des CR médicaux | 🟡 Extraction terminée (400 CR) — validation avant livraison |
 | **CU5a** | Identification automatique des biomarqueurs en oncologie | 🟡 Extraction terminée — annotation en attente |
 | **CU5b** | Analyse de la réponse aux traitements en oncologie | 🟡 Extraction terminée — annotation en attente |
@@ -27,13 +27,12 @@ Foch évalue les cas d'usage : **CU1, CU2, CU3, CU5a, CU5b**.
 - [ ] Vérifier la couverture des strates après annotation (voir `metadata_cu1.csv`)
 - [ ] Livrer les fichiers annotés au Health Data Hub
 
-### CU2 — Codage CIM-10 *(pipeline prêt)*
+### CU2 — Codage CIM-10 *(extraction en cours)*
 
-- [ ] **Obtenir la liste des GHM** de l'annexe PARTAGES auprès du porteur de projet
-- [ ] Renseigner `ghm_whitelist` dans `WP2_CU2/config.py`
-- [ ] Supprimer `WP2_CU2/output/cu2_dataset.csv` si des lignes invalides subsistent
-- [ ] Relancer `python WP2_CU2/fetch_rss.py` (si `pool_rss.csv` absent ou obsolète)
-- [ ] Relancer `python WP2_CU2/extract_cu2.py`
+- [x] **Obtenir la liste des GHM** de l'annexe PARTAGES — reçue le 13/12/2025 (71 GHM : ortho/traumato, viscéral, urologie)
+- [x] Intégrer le référentiel : `WP2_CU2/referentiel/liste_ghm_chirurgie_ambulatoire.csv` — `ghm_whitelist` et mapping GHM → spécialité chargés automatiquement par `config.py`
+- [x] Archiver les sorties extraites sans filtre GHM (`output/archive_20260706_sans_filtre_ghm/`)
+- [x] Relancer `python WP2_CU2/extract_cu2.py` — lancée le 06/07/2026 sur le pool filtré (6 695 séjours éligibles, `pool_rss.csv` refiltré à la volée, pas besoin de relancer `fetch_rss.py`)
 - [ ] Vérifier le taux de séjours avec texte extrait dans `cu2_stats.csv`
 - [ ] Livrer `cu2_dataset.csv` au Health Data Hub *(ne pas livrer `cu2_correspondance_INTERNE.csv`)*
 
@@ -166,7 +165,7 @@ WP1_CU1/output/
 | Volume cible | 1 000 séjours (tirage aléatoire) |
 | Critère temporel | 2023, 2024, 2025 |
 | Filtre | Séjours ambulatoires (durée = 0 jour) |
-| Filtre GHM | Liste blanche à configurer (`ghm_whitelist` dans `config.py`) |
+| Filtre GHM | 71 GHM de l'annexe PARTAGES (ortho/traumato, viscéral, urologie) — `WP2_CU2/referentiel/liste_ghm_chirurgie_ambulatoire.csv` |
 | Source RSS | `S:\Envoi-EDS-PMSI` |
 | Source documents | METADONE — CRH + CRO |
 | Format de sortie | `cu2_dataset.csv` (séparateur `;`) — 5 colonnes |
@@ -176,7 +175,7 @@ WP1_CU1/output/
 | Colonne | Description |
 |---------|-------------|
 | `ID` | Identifiant anonymisé du séjour (hash SHA-256, 16 hex chars) |
-| `Spécialité` | Spécialité médicale déduite du préfixe GHM |
+| `Spécialité` | Spécialité médicale du GHM (mapping exact du référentiel annexe) |
 | `Texte` | Texte extrait du/des CRH + CRO (séparés par `---`) |
 | `Codes CCAM` | Codes CCAM du RSS, séparés par des espaces |
 | `CIM-10 DP` | Diagnostic principal du RSS |
@@ -197,6 +196,7 @@ WP2_CU2/output/
 ├── pool_rss.csv                       # Pool de séjours éligibles (fetch_rss)
 ├── cu2_dataset.csv                    # Dataset livré à PARTAGES
 ├── cu2_stats.csv                      # Statistiques par spécialité
+├── cu2_cim10_frequency.csv            # Distribution complète des CIM-10 DP
 └── cu2_correspondance_INTERNE.csv     # ID ↔ numero_admin réel — usage interne uniquement
 ```
 
@@ -348,9 +348,11 @@ PARTAGES-Foch/
 │   ├── extract_cu1.py           # Étape 2 : extraction des 400 CR
 │   └── output/                  # Généré à l'exécution (non versionné)
 ├── WP2_CU2/
-│   ├── config.py                # Paramètres CU2 + connexion DB
+│   ├── config.py                # Paramètres CU2 + connexion DB (whitelist GHM auto-chargée)
 │   ├── fetch_rss.py             # Étape 1 : RSS → pool_rss.csv
 │   ├── extract_cu2.py           # Étape 2 : extraction itérative du dataset
+│   ├── referentiel/
+│   │   └── liste_ghm_chirurgie_ambulatoire.csv  # 71 GHM annexe PARTAGES (ortho/viscéral/uro)
 │   └── output/                  # Généré à l'exécution (non versionné)
 ├── WP3_CU3/
 │   ├── config.py                # Paramètres CU3 (fenêtre 2020+, balises conclusion, seuils)
