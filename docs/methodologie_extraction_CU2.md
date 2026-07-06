@@ -21,7 +21,7 @@ modèle qui prédit le DP à partir du compte rendu et des actes.
 | Volume cible | **1 000 séjours** (tirage aléatoire) |
 | Période | **2023–2025** |
 | Périmètre | Séjours de **chirurgie ambulatoire** (durée = 0 jour) |
-| Spécialités visées | Urologie, chirurgie digestive, orthopédie (GHM de l'annexe PARTAGES) |
+| Spécialités visées | Chirurgie orthopédique/traumato, chirurgie viscérale, urologie — **71 GHM** de l'annexe PARTAGES (13/12/2025) |
 | Entrée | Texte CRH et/ou CRO + codes CCAM du séjour |
 | Cible | CIM-10 du diagnostic principal (PMSI) |
 | Annotation | **Aucune** (simple fichier CSV) |
@@ -47,13 +47,19 @@ Le format **RSS groupé 120** (ATIH 2020) est parsé par `utils/rss_parser.py`. 
 ```
 Années ∈ {2023, 2024, 2025}
 ET durée de séjour = 0 jour            -- chirurgie ambulatoire (inclut les HDJ)
-ET ghm ∈ ghm_whitelist                 -- liste de l'annexe PARTAGES (si renseignée)
+ET ghm ∈ ghm_whitelist                 -- 71 GHM de l'annexe PARTAGES
 PUIS dédoublonnage sur numero_admin    -- un séjour = une ligne
 ```
 
 - **Durée = 0** : sélectionne l'ambulatoire (et les hôpitaux de jour), conformément au guide.
-- **Filtre GHM** : la `ghm_whitelist` (`WP2_CU2/config.py`) restreint aux GHM de l'annexe (urologie,
-  chirurgie digestive, orthopédie). Voir §10 (point en attente).
+- **Filtre GHM** : la `ghm_whitelist` est chargée automatiquement depuis le **référentiel versionné**
+  `WP2_CU2/referentiel/liste_ghm_chirurgie_ambulatoire.csv` (annexe PARTAGES du 13/12/2025,
+  convertie de l'Excel en CSV UTF-8). Il contient **71 GHM** : 32 chirurgie orthopédique/traumato,
+  21 chirurgie viscérale, 18 urologie.
+- **Sécurité** : le filtre GHM est **aussi appliqué au chargement du pool** dans `extract_cu2.py`
+  (`load_pool`), afin qu'un `pool_rss.csv` généré avant réception du référentiel soit filtré à la
+  volée sans devoir relancer `fetch_rss.py`. Sur le pool Foch 2023–2025 : 151 121 séjours
+  ambulatoires → **6 695 séjours** dans le périmètre GHM.
 
 Le pool éligible est sauvegardé dans `output/pool_rss.csv`.
 
@@ -89,7 +95,7 @@ CRH et CRO d'un même séjour sont **concaténés dans une seule colonne** (sép
 | Colonne | Contenu | Source |
 |---|---|---|
 | `ID` | Identifiant anonymisé du séjour = `SHA-256(numero_admin)` tronqué à 16 hex | calculé |
-| `Spécialité` | Spécialité médicale déduite du GHM | mapping GHM (§5.1) |
+| `Spécialité` | Spécialité médicale du GHM (référentiel annexe) | mapping GHM (§5.1) |
 | `Texte` | CRH et/ou CRO concaténés (une seule colonne) | Easily |
 | `Codes CCAM` | Codes CCAM du séjour, **séparés par un espace** | RSS |
 | `CIM-10 DP` | Diagnostic principal du séjour (**cible**) | RSS |
@@ -99,19 +105,24 @@ CRH et CRO d'un même séjour sont **concaténés dans une seule colonne** (sép
 > donc que les **codes** CCAM.
 
 ### 5.1 De GHM à spécialité
-`get_specialite()` déduit la spécialité du **préfixe à 2 caractères du GHM** (catégorie majeure de
-diagnostic, ex. `06 → Appareil digestif`, `08 → Appareil musculo-squelettique`, `11/12 → uro-génital`).
-Mapping dans `ghm_to_specialite` (`WP2_CU2/config.py`). Voir §10 pour l'alignement sur le regroupement
-exact de l'annexe.
+`get_specialite()` utilise en priorité le **mapping exact GHM → spécialité du référentiel de
+l'annexe** (`ghm_specialites`, chargé depuis
+`WP2_CU2/referentiel/liste_ghm_chirurgie_ambulatoire.csv`) : `CH.ORTHO.ET TRAUMATO`,
+`CHIRURGIE VISCERALE`, `UROLOGIE`. En repli (GHM hors référentiel, cas normalement impossible après
+filtrage), la spécialité est déduite du **préfixe à 2 caractères du GHM** (catégorie majeure de
+diagnostic, `ghm_to_specialite`).
 
 ---
 
 ## 6. Architecture en 2 étapes
 
 1. **`fetch_rss.py`** — parse les RSS, filtre (ambulatoire, GHM), dédoublonne → `output/pool_rss.csv`.
-2. **`extract_cu2.py`** — tire aléatoirement `target_count` séjours (`random_state = 42`), apparie les
-   CR, extrait le texte, écrit le dataset. **Reprise automatique** : les séjours déjà présents dans le
-   CSV de sortie sont ignorés (écriture ligne à ligne, robuste aux interruptions).
+2. **`extract_cu2.py`** — re-filtre le pool par GHM (sécurité), tire aléatoirement `target_count`
+   séjours (`random_state = 42`), apparie les CR, extrait le texte, écrit le dataset.
+   **Reprise automatique** : les séjours déjà présents dans le CSV de sortie sont ignorés (écriture
+   ligne à ligne, robuste aux interruptions). **Garde-fou** : si des séjours déjà extraits sont hors
+   du pool filtré (extraction antérieure au référentiel GHM), une alerte demande d'archiver les
+   sorties et de relancer.
 
 ```bash
 python WP2_CU2/fetch_rss.py
@@ -158,9 +169,10 @@ dataset au RSS (sexe, date de naissance, date d'entrée) via la table de corresp
 | `years` | 2023, 2024, 2025 | Période |
 | `target_count` | 1000 | Nombre de séjours tirés |
 | `only_ambulatoire` | True | Filtre durée = 0 |
-| `ghm_whitelist` | (vide → à renseigner) | GHM de l'annexe (urologie/digestif/ortho) |
+| `ghm_whitelist` | 71 GHM (chargés du référentiel) | GHM de l'annexe (ortho/viscéral/uro) |
+| `ghm_specialites` | dict (chargé du référentiel) | Mapping exact GHM → spécialité |
 | `crh_doc_patterns` / `cro_doc_patterns` | motifs | Identification CRH / CRO |
-| `ghm_to_specialite` | dict | GHM (préfixe 2c) → spécialité |
+| `ghm_to_specialite` | dict | Repli : GHM (préfixe 2c) → spécialité |
 | `tolerance_days` | 3 | Fenêtre d'appariement par dates |
 | `rss_base_path` | `S:\Envoi-EDS-PMSI` | Source RSS |
 
@@ -181,8 +193,8 @@ dataset au RSS (sexe, date de naissance, date d'entrée) via la table de corresp
 | Pas d'annotation (FAQ #2) | ✅ Conforme |
 | ID anonymisé | ✅ Conforme (hash SHA-256) |
 | 5 colonnes : ID, Spécialité, Texte, Codes CCAM, CIM-10 DP | ✅ Conforme |
-| Séjours filtrés sur les **GHM de l'annexe** (uro/digestif/ortho) | ⚠️ En attente de la liste GHM (§10) |
-| Spécialité = **GHM regroupés** (liste annexe) | ⚠️ Proxy par CMD ATIH en attendant (§10) |
+| Séjours filtrés sur les **GHM de l'annexe** (ortho/viscéral/uro) | ✅ Conforme (71 GHM, référentiel du 13/12/2025) |
+| Spécialité = **GHM regroupés** (liste annexe) | ✅ Conforme (mapping exact du référentiel) |
 | Métadonnées 5.4 : nb séjours/spécialité, **sexe ratio**, **âge moyen**, **fréquence CIM-10** | ✅ Conforme (`cu2_stats.csv` + `cu2_cim10_frequency.csv`) |
 | Représentativité de chaque GHM (5.2) | 🟡 Tirage aléatoire (proportions naturelles) |
 
@@ -190,12 +202,11 @@ dataset au RSS (sexe, date de naissance, date d'entrée) via la table de corresp
 
 ## 10. Points en attente / limites
 
-- **Liste GHM de l'annexe (bloquant pour le périmètre exact)** : `ghm_whitelist` est **vide** ⇒
-  aucun filtre GHM n'est appliqué, donc la sélection couvre **tous** les séjours ambulatoires et pas
-  seulement urologie / chirurgie digestive / orthopédie. À renseigner dès réception de l'annexe
-  auprès du porteur de projet.
-- **Spécialité** : déduite de la **catégorie majeure de diagnostic** (préfixe GHM 2 car.), proxy en
-  attendant le **regroupement exact** GHM→spécialité de l'annexe.
+- **Liste GHM de l'annexe** : ✅ **résolu** — référentiel reçu le 13/12/2025 et versionné dans
+  `WP2_CU2/referentiel/liste_ghm_chirurgie_ambulatoire.csv` (71 GHM). Le filtre et le mapping
+  spécialité sont chargés automatiquement ; une extraction lancée **avant** réception du référentiel
+  est détectée au démarrage (garde-fou : séjours déjà extraits hors du pool filtré) avec consigne
+  d'archiver les sorties et de relancer.
 - **Codage professionnalisé** (5.2) : recommandé par le guide, non vérifiable automatiquement.
 
 ---
