@@ -1,0 +1,72 @@
+﻿specialite;ghm;libelle_ghm
+CH.ORTHO.ET TRAUMATO;01C14J;Libérations de nerfs superficiels à l'exception du médian au canal carpien, en ambulatoire
+CH.ORTHO.ET TRAUMATO;01C15J;Libérations du médian au canal carpien, en ambulatoire
+CH.ORTHO.ET TRAUMATO;05C13J;Amputations pour troubles circulatoires portant sur le membre supérieur ou les orteils, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C241;Prothèses de genou, niveau 1
+CH.ORTHO.ET TRAUMATO;08C251;Prothèses d'épaule, niveau 1
+CH.ORTHO.ET TRAUMATO;08C271;Autres interventions sur le rachis, niveau 1
+CH.ORTHO.ET TRAUMATO;08C32J;Interventions sur la jambe, âge supérieur à 17 ans, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C331;Interventions sur la cheville et l'arrière-pied à l'exception des fractures, niveau 1
+CH.ORTHO.ET TRAUMATO;08C34J;Interventions sur les ligaments croisés sous arthroscopie, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C35J;Interventions sur le bras, coude et épaule, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C36J;Interventions sur le pied, âge inférieur à 18 ans, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C37J;Interventions sur le pied, âge supérieur à 17 ans, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C38J;Autres arthroscopies du genou, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C39J;Interventions sur l'avant-bras, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C40J;Arthroscopies d'autres localisations, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C42J;Interventions non mineures sur les tissus mous, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C43J;Interventions non mineures sur la main, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C44J;Autres interventions sur la main, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C45J;Ménisectomie sous arthroscopie, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C46J;Autres interventions sur les tissus mous, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C481;Prothèses de hanche pour des affections autres que des traumatismes récents, niveau 1
+CH.ORTHO.ET TRAUMATO;08C501;Interventions sur la hanche et le fémur sauf traumatismes récents, âge supérieur à 17 ans, niveau 1
+CH.ORTHO.ET TRAUMATO;08C531;Interventions sur le genou pour traumatismes, niveau 1
+CH.ORTHO.ET TRAUMATO;08C54J;Interventions sur le genou pour des affections autres que traumatiques, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C57J;Libérations articulaires du membre inférieur à l'exception de la hanche et du pied, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C58J;Arthroscopies de l'épaule, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C59J;Ténosynovectomies du poignet, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C60J;Interventions sur le poignet autres que les ténosynovectomies, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08C62J;Autres interventions pour infections ostéoarticulaires, en ambulatoire
+CH.ORTHO.ET TRAUMATO;08K06Z;Autres actes interventionnels sur le rachis, séjours de moins de 2 nuits
+CH.ORTHO.ET TRAUMATO;09C34J;Autres interventions de la CMD09, en ambulatoire
+CH.ORTHO.ET TRAUMATO;21C04J;Interventions sur la main ou le poignet à la suite de blessures, en ambulatoire
+CHIRURGIE VISCERALE;06C091;Appendicectomies non compliquées, niveau 1
+CHIRURGIE VISCERALE;06C10J;Interventions réparatrices pour hernies et éventrations, âge inférieur à 18 ans, en ambulatoire
+CHIRURGIE VISCERALE;06C12J;Interventions réparatrices pour hernies inguinales et crurales, âge supérieur à 17 ans, en ambulatoire
+CHIRURGIE VISCERALE;06C14J;Interventions sur le rectum et l'anus autres que les résections rectales, en ambulatoire
+CHIRURGIE VISCERALE;06C151;Autres interventions sur le tube digestif en dehors des laparotomies, niveau 1
+CHIRURGIE VISCERALE;06C19J;Hémorroïdectomies, en ambulatoire
+CHIRURGIE VISCERALE;06C24J;Cures d'éventrations postopératoires, âge supérieur à 17 ans, en ambulatoire
+CHIRURGIE VISCERALE;06C25J;Interventions réparatrices pour hernies à l'exception des hernies inguinales, crurales, âge supérieur à 17 ans, en ambulatoire
+CHIRURGIE VISCERALE;06K06J;Affections digestives sans acte opératoire de la CMD 06, avec anesthésie, en ambulatoire
+CHIRURGIE VISCERALE;07C101;Interventions sur le foie, le pancréas et les veines porte ou cave pour affections non malignes, niveau 1
+CHIRURGIE VISCERALE;07C131;Cholécystectomies sans exploration de la voie biliaire principale pour affections aigües, niveau 1
+CHIRURGIE VISCERALE;07C14J;Cholécystectomies sans exploration de la voie biliaire principale à l'exception des affections aigües, en ambulatoire
+CHIRURGIE VISCERALE;09C08J;Interventions sur la région anale et périanale, en ambulatoire
+CHIRURGIE VISCERALE;09C13J;Interventions pour condylomes anogénitaux, en ambulatoire
+CHIRURGIE VISCERALE;09C26J;Interventions pour tumeurs bénignes, naevus, kystes ou atteintes de l'ongle, en ambulatoire
+CHIRURGIE VISCERALE;09C29J;Interventions intermédiaires d'exérèse ou de greffe, en ambulatoire
+CHIRURGIE VISCERALE;10C051;Interventions sur les parathyroïdes, niveau 1
+CHIRURGIE VISCERALE;10C101;Autres interventions pour obésité, niveau 1
+CHIRURGIE VISCERALE;10C131;Interventions digestives autres que les gastroplasties, pour obésité, niveau 1
+CHIRURGIE VISCERALE;17C071;Interventions intermédiaires de la CMD17, niveau 1
+CHIRURGIE VISCERALE;17C08J;Interventions mineures de la CMD17, en ambulatoire
+UROLOGIE;11C061;Interventions sur l'urètre, âge inférieur à 18 ans, niveau 1
+UROLOGIE;11C10J;Interventions pour incontinence urinaire en dehors des interventions transurétrales, en ambulatoire
+UROLOGIE;11C11J;Interventions par voie transurétrale ou transcutanée pour lithiases urinaires, en ambulatoire
+UROLOGIE;11C12J;Injections de toxine botulique dans l'appareil urinaire, en ambulatoire
+UROLOGIE;11C13J;Interventions par voie transurétrale ou transcutanée pour des affections non lithiasiques, en ambulatoire
+UROLOGIE;11K03Z;Endoscopies génito-urinaires thérapeutiques et anesthésie : séjours de la CMD 11 et de moins de 2 jours
+UROLOGIE;11K05Z;Endoscopies génito-urinaires diagnostiques et anesthésie : séjours de la CMD 11 et de moins de 2 jours
+UROLOGIE;11K06Z;Séjours de la CMD 11 comprenant une endoscopie génito-urinaire diagnostique sans anesthésie : séjours de moins de 2 jours
+UROLOGIE;12C03J;Interventions sur le pénis, en ambulatoire
+UROLOGIE;12C04J;Prostatectomies transurétrales, en ambulatoire
+UROLOGIE;12C06J;Interventions sur les testicules pour affections non malignes, âge inférieur à 18 ans, en ambulatoire
+UROLOGIE;12C07J;Interventions sur les testicules pour affections non malignes, âge supérieur à 17 ans, en ambulatoire
+UROLOGIE;12C08J;Circoncision, en ambulatoire
+UROLOGIE;12K06J;Séjours comprenant une biopsie prostatique, en ambulatoire
+UROLOGIE;13K02Z;Endoscopies génito-urinaires thérapeutiques et anesthésie : séjours de la CMD 13 et de moins de 2 jours
+UROLOGIE;13K03Z;Séjours de la CMD 13 comprenant une endoscopie génito-urinaire thérapeutique sans anesthésie : séjours de moins de 2 jours
+UROLOGIE;13K04Z;Endoscopies génito-urinaires diagnostiques et anesthésie : séjours de la CMD 13 et de moins de 2 jours
+UROLOGIE;13K05Z;Endoscopies génito-urinaires diagnostiques sans anesthésie : séjours de la CMD 13 et de moins de 2 jours
