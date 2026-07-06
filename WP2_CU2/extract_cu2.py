@@ -49,6 +49,17 @@ def load_pool(config: CU2Config) -> pd.DataFrame:
             f"Colonne 'numero_admin' absente de {config.paths.pool_rss_path}.\n"
             "→ Régénérez le pool : python WP2_CU2/fetch_rss.py"
         )
+    # Filtre GHM (liste blanche) : appliqué aussi ici pour couvrir un pool
+    # généré avant réception du référentiel GHM.
+    whitelist = set(config.extraction.ghm_whitelist)
+    if whitelist and "ghm" in df.columns:
+        before = len(df)
+        df = df[df["ghm"].fillna("").str.strip().isin(whitelist)].copy()
+        if len(df) < before:
+            print(
+                f"   → Filtre GHM ({len(whitelist)} GHM) : "
+                f"{len(df):,} séjours retenus sur {before:,}"
+            )
     return df
 
 
@@ -67,11 +78,18 @@ def hash_sejour_id(numero_admin: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def get_specialite(ghm: str, mapping: dict) -> str:
-    """Retourne la spécialité médicale à partir du préfixe à 2 caractères du GHM."""
-    if not ghm or len(ghm) < 2:
+def get_specialite(ghm: str, exact_mapping: dict, prefix_mapping: dict) -> str:
+    """Retourne la spécialité médicale d'un GHM.
+
+    Priorité au mapping exact du référentiel PARTAGES (GHM → spécialité),
+    repli sur le préfixe CMD (2 premiers caractères) sinon.
+    """
+    ghm = (ghm or "").strip()
+    if len(ghm) < 2:
         return "Inconnu"
-    return mapping.get(ghm[:2], f"GHM_{ghm[:2]}")
+    if ghm in exact_mapping:
+        return exact_mapping[ghm]
+    return prefix_mapping.get(ghm[:2], f"GHM_{ghm[:2]}")
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +351,26 @@ def run_extraction(config: CU2Config = None):
     # 3. Reprise : ignorer les séjours déjà traités
     already_done = _load_already_done(config.paths.output_csv_path)
     if already_done:
+        # Garde-fou : des séjours extraits avant réception du référentiel GHM
+        # peuvent être hors du pool filtré ; ils resteraient dans le CSV final.
+        try:
+            corr = pd.read_csv(
+                config.paths.correspondence_path,
+                sep=";", encoding="utf-8-sig", dtype=str,
+            )
+            pool_numeros = set(df_pool["numero_admin"].fillna("").str.strip())
+            stale = corr[
+                ~corr["numero_admin"].fillna("").str.strip().isin(pool_numeros)
+            ]
+            if not stale.empty:
+                print(
+                    f"   ⚠️ {len(stale)} séjours déjà extraits sont hors du pool "
+                    "filtré par GHM (extraction antérieure au référentiel ?).\n"
+                    "      → Pour un dataset conforme, archivez/supprimez "
+                    "cu2_dataset.csv et cu2_correspondance_INTERNE.csv puis relancez."
+                )
+        except Exception:
+            pass
         # Pré-calculer les IDs du sample pour filtrer
         df_sample["_id"] = df_sample["numero_admin"].apply(
             lambda x: hash_sejour_id(str(x).strip())
@@ -392,7 +430,11 @@ def run_extraction(config: CU2Config = None):
         codes_ccam = str(row.get("codes_ccam", "")).strip()
 
         sejour_id = hash_sejour_id(numero_admin)
-        specialite = get_specialite(ghm, config.extraction.ghm_to_specialite)
+        specialite = get_specialite(
+            ghm,
+            config.extraction.ghm_specialites,
+            config.extraction.ghm_to_specialite,
+        )
 
         docs_df, method = find_docs_for_sejour(
             cursor,

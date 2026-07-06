@@ -3,6 +3,7 @@ Configuration pour l'extraction CU2 - Codage CIM-10 depuis CRH
 Hôpital Foch / Projet PARTAGES
 """
 
+import csv
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,6 +11,33 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
+
+
+# --- Référentiel GHM chirurgie ambulatoire (annexe PARTAGES, reçue le 13/12/2025) ---
+# Source : liste_ghm_chirurgie_ambulatoire_20251213.xlsx, convertie en CSV UTF-8.
+# Colonnes : specialite ; ghm ; libelle_ghm
+GHM_REFERENTIEL_PATH = (
+    Path(__file__).parent / "referentiel" / "liste_ghm_chirurgie_ambulatoire.csv"
+)
+
+
+def _load_ghm_referentiel() -> list[dict]:
+    """Charge le référentiel GHM. Retourne [] si le fichier est absent."""
+    if not GHM_REFERENTIEL_PATH.exists():
+        return []
+    with open(GHM_REFERENTIEL_PATH, encoding="utf-8-sig", newline="") as f:
+        return [row for row in csv.DictReader(f, delimiter=";") if row.get("ghm")]
+
+
+def _ghm_whitelist_from_referentiel() -> list:
+    return [row["ghm"].strip() for row in _load_ghm_referentiel()]
+
+
+def _ghm_specialites_from_referentiel() -> dict:
+    return {
+        row["ghm"].strip(): row["specialite"].strip()
+        for row in _load_ghm_referentiel()
+    }
 
 
 @dataclass
@@ -48,10 +76,12 @@ class ExtractionConfig:
     only_ambulatoire: bool = True
 
     # --- Filtre GHM (liste blanche) ---
-    # Laisser vide pour ne pas filtrer par GHM.
-    # Renseigner avec les GHM de l'annexe fournie par le porteur du projet.
-    # Exemple : ["28Z07Z", "28Z14Z", ...]
-    ghm_whitelist: list = field(default_factory=list)
+    # Chargée depuis le référentiel PARTAGES (71 GHM de chirurgie ambulatoire :
+    # ortho/traumato, viscéral, urologie). Vide si le fichier est absent → pas de filtre.
+    ghm_whitelist: list = field(default_factory=_ghm_whitelist_from_referentiel)
+
+    # --- Mapping exact GHM → spécialité (issu du même référentiel) ---
+    ghm_specialites: dict = field(default_factory=_ghm_specialites_from_referentiel)
 
     # --- Patterns de noms de documents CRH (Compte-Rendu Hospitalisation) ---
     crh_doc_patterns: list = field(default_factory=lambda: [
@@ -73,9 +103,9 @@ class ExtractionConfig:
         "%Compte Rendu Opératoire%",
     ])
 
-    # --- Mapping GHM → Spécialité médicale ---
-    # Préfixe du GHM (2 premiers caractères) → libellé spécialité
-    # Complétez selon le référentiel ATIH ou l'annexe PARTAGES.
+    # --- Mapping GHM → Spécialité médicale (repli) ---
+    # Utilisé seulement si le GHM n'est pas dans ghm_specialites :
+    # préfixe du GHM (2 premiers caractères = CMD) → libellé.
     ghm_to_specialite: dict = field(default_factory=lambda: {
         "01": "Système nerveux",
         "02": "Œil",

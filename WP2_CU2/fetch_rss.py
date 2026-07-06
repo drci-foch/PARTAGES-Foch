@@ -47,10 +47,11 @@ def fetch_rss(config: CU2Config = None):
         df = df[df["duree_sejour"] == 0].copy()
         print(f"   → {len(df):,} séjours ambulatoires (durée = 0)")
 
-    # Filtre GHM
+    # Filtre GHM (référentiel PARTAGES chirurgie ambulatoire)
     if config.extraction.ghm_whitelist:
-        df = df[df["ghm"].isin(config.extraction.ghm_whitelist)].copy()
-        print(f"   → {len(df):,} après filtre GHM ({len(config.extraction.ghm_whitelist)} GHM)")
+        whitelist = set(config.extraction.ghm_whitelist)
+        df = df[df["ghm"].fillna("").astype(str).str.strip().isin(whitelist)].copy()
+        print(f"   → {len(df):,} après filtre GHM ({len(whitelist)} GHM)")
 
     if df.empty:
         print("⚠️  Aucun séjour après filtrage.")
